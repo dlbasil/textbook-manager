@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מנהל ספרי לימוד</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f6fa; --surface: #fff; --primary: #3b6fc4; --primary-light: #e8effe;
+    --success: #22a06b; --success-light: #e3f9f0; --danger: #e03131; --danger-light: #fff0f0;
+    --warning: #f08c00; --warning-light: #fff8e6; --text: #1a1d23; --text-muted: #6b7280;
+    --border: #e5e7eb; --radius: 10px; --shadow: 0 1px 4px rgba(0,0,0,.07); --shadow-md: 0 4px 16px rgba(0,0,0,.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+  #app { display: flex; min-height: 100vh; }
+  #sidebar { width: 220px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; position: fixed; top: 0; right: 0; bottom: 0; z-index: 10; }
+  #main { margin-right: 220px; flex: 1; min-height: 100vh; }
+  #topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 28px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 5; }
+  #content { padding: 28px; }
+  .sidebar-logo { padding: 20px 18px 14px; font-size: 16px; font-weight: 700; color: var(--primary); border-bottom: 1px solid var(--border); }
+  .sidebar-logo span { font-size: 11px; font-weight: 400; color: var(--text-muted); display: block; margin-top: 2px; }
+  .nav-section { padding: 10px 0 4px; }
+  .nav-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; padding: 6px 18px 4px; letter-spacing: .8px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 18px; cursor: pointer; color: var(--text); transition: background .15s; font-size: 13.5px; }
+  .nav-item:hover { background: var(--bg); }
+  .nav-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; border-right: 3px solid var(--primary); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+  .topbar-title { font-size: 16px; font-weight: 600; }
+  .topbar-year { font-size: 13px; color: var(--text-muted); background: var(--bg); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); cursor: pointer; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); }
+  .card-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-body { padding: 20px; }
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .stat-value { font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 12px; color: var(--text-muted); }
+  .stat-sub { font-size: 11px; margin-top: 6px; }
+  .stat-card.primary .stat-value { color: var(--primary); }
+  .stat-card.success .stat-value { color: var(--success); }
+  .stat-card.danger .stat-value { color: var(--danger); }
+  .stat-card.warning .stat-value { color: var(--warning); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--bg); padding: 10px 12px; text-align: right; font-weight: 600; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .badge.success { background: var(--success-light); color: var(--success); }
+  .badge.danger { background: var(--danger-light); color: var(--danger); }
+  .badge.warning { background: var(--warning-light); color: var(--warning); }
+  .badge.primary { background: var(--primary-light); color: var(--primary); }
+  .badge.gray { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+  .badge.manual { background: #fff8e6; color: #b45309; border: 1px solid #fde68a; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: #2d5ba8; }
+  .btn-outline { background: #fff; color: var(--text); border-color: var(--border); }
+  .btn-outline:hover { background: var(--bg); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-success:hover { background: #1a8358; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #b91c1c; }
+  .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+  .search-input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; outline: none; background: var(--surface); }
+  .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+  select.filter-select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; background: var(--surface); cursor: pointer; outline: none; }
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 28px; text-align: center; cursor: pointer; transition: all .2s; background: var(--bg); }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--primary); background: var(--primary-light); }
+  .upload-zone .icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-zone p { color: var(--text-muted); font-size: 12px; }
+  .upload-zone strong { color: var(--primary); }
+  input[type=file] { display: none; }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius); width: 820px; max-width: 96vw; max-height: 88vh; overflow: auto; box-shadow: var(--shadow-md); }
+  .modal-header { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .modal-body { padding: 22px; }
+  .modal-close { cursor: pointer; font-size: 20px; color: var(--text-muted); background: none; border: none; }
+  .grade-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 10px; }
+  .grade-box { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 6px; text-align: center; }
+  .grade-box .grade-name { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .grade-box .grade-count { font-size: 18px; font-weight: 700; }
+  .grade-box .grade-prev { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+  .grade-box.form-data { border-color: var(--success); background: var(--success-light); }
+  .grade-box.form-data .grade-count { color: var(--success); }
+  .grade-box.roster-data { border-color: #94a3b8; }
+  .grade-box.roster-data .grade-count { color: #475569; }
+  .notif { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1d23; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .notif.show { opacity: 1; }
+  .import-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px; }
+  .import-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+  .import-card h3 { font-size: 14px; margin-bottom: 5px; }
+  .import-card p { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+  .import-card .status-line { font-size: 12px; margin-top: 10px; display: flex; align-items: center; gap: 6px; }
+  .chart-container { position: relative; height: 220px; }
+  /* Books table */
+  .books-table { width: 100%; font-size: 12px; }
+  .books-table th { padding: 7px 10px; font-size: 11px; }
+  .books-table td { padding: 7px 10px; }
+  .books-table .qty { text-align: center; font-weight: 600; color: var(--primary); }
+  .books-table .book-name { max-width: 320px; }
+  /* Merge banner */
+  .merge-banner { background: var(--primary-light); border: 1px solid #bfdbfe; border-radius: var(--radius); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  /* edit input */
+  .edit-input { width: 56px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; text-align: center; }
+  .edit-input:focus { border-color: var(--primary); outline: none; }
+  .edit-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .edit-row:last-child { border-bottom: none; }
+  .edit-label { flex: 1; font-size: 13px; }
+  /* source legend */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  @media (max-width: 900px) {
+    #sidebar { display: none; } #main { margin-right: 0; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .import-cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div class="sidebar-logo">📚 ספרי לימוד<span>מערכת ניהול</span></div>
+    <div class="nav-section">
+      <div class="nav-label">ניהול</div>
+      <div class="nav-item active" onclick="navigate('dashboard')"><span class="icon">🏠</span> דשבורד</div>
+      <div class="nav-item" onclick="navigate('schools')"><span class="icon">🏫</span> בתי ספר</div>
+      <div class="nav-item" onclick="navigate('responses')"><span class="icon">📋</span> מילאו / לא מילאו</div>
+      <div class="nav-item" onclick="navigate('order')"><span class="icon">📦</span> פירוט הזמנה</div>
+      <div class="nav-item" onclick="navigate('reports')"><span class="icon">📊</span> דוחות</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">הגדרות</div>
+      <div class="nav-item" onclick="navigate('import')"><span class="icon">📂</span> ייבוא קבצים</div>
+      <div class="nav-item" onclick="confirmReset()" style="color:var(--danger);"><span class="icon">🗑️</span> איפוס נתונים</div>
+    </div>
+    <div style="margin-top:auto; padding:14px 18px; font-size:11px; color:var(--text-muted); border-top:1px solid var(--border);">
+      שנת לימודים: <strong id="sidebar-year">—</strong>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="topbar">
+      <div class="topbar-title" id="topbar-title">דשבורד</div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn btn-success" onclick="exportComprehensive()" style="font-size:12px;padding:6px 14px;">📥 ייצוא מקיף</button>
+        <div class="topbar-year" onclick="changeYear()">שנה: <strong id="topbar-year-val">—</strong></div>
+      </div>
+    </div>
+
+    <div id="content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-row">
+          <div class="stat-card primary"><div class="stat-value" id="stat-total">—</div><div class="stat-label">סה"כ בתי ספר</div><div class="stat-sub" style="color:var(--text-muted)">ברשימת הקשר</div></div>
+          <div class="stat-card success"><div class="stat-value" id="stat-filled">—</div><div class="stat-label">מילאו טופס</div><div class="stat-sub" id="stat-filled-pct" style="color:var(--success)">0%</div></div>
+          <div class="stat-card danger"><div class="stat-value" id="stat-missing">—</div><div class="stat-label">לא מילאו</div><div class="stat-sub" id="stat-missing-pct" style="color:var(--danger)">0%</div></div>
+          <div class="stat-card warning"><div class="stat-value" id="stat-students">—</div><div class="stat-label">סה"כ תלמידים (טופס)</div><div class="stat-sub" style="color:var(--text-muted)">נתונים עדכניים</div></div>
+        </div>
+        <div class="grid-2" style="margin-bottom:20px;">
+          <div class="card">
+            <div class="card-header"><div class="card-title">📊 אחוז מילוי לפי שכבה</div></div>
+            <div class="card-body"><div class="chart-container"><canvas id="chart-response-bar"></canvas></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">🎓 התפלגות תלמידים לפי כיתה</div></div>
+            <div class="card-body"><div class="chart-container"><canvas id="chart-grade-bar"></canvas></div></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">✅ אחרון מילאו</div></div>
+            <div class="card-body" style="padding:0;">
+              <table><thead><tr><th>שם בי"ס</th><th>סמל</th><th>תאריך</th><th>סה"כ</th></tr></thead>
+              <tbody id="tbody-recent"></tbody></table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">❌ לא מילאו</div><button class="btn btn-sm btn-outline" onclick="navigate('responses')">הצג הכל</button></div>
+            <div class="card-body" style="padding:0;">
+              <table><thead><tr><th>שם בי"ס</th><th>סמל</th><th>איש קשר</th><th>טלפון</th></tr></thead>
+              <tbody id="tbody-missing-preview"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCHOOLS -->
+      <div class="page" id="page-schools">
+        <div class="filter-bar">
+          <input class="search-input" id="search-schools" placeholder="🔍 חיפוש לפי שם / סמל / שכונה..." oninput="renderSchools()">
+          <select class="filter-select" id="filter-status" onchange="renderSchools()">
+            <option value="">כל הסטטוסים</option><option value="filled">מילאו</option><option value="missing">לא מילאו</option>
+          </select>
+          <select class="filter-select" id="filter-level" onchange="renderSchools()">
+            <option value="">כל השכבות</option>
+          </select>
+          <select class="filter-select" id="filter-status-school" onchange="renderSchools()">
+            <option value="">כל המעמדות</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="openAddSchoolModal()">+ הוסף בי"ס</button>
+          <div style="margin-right:auto;font-size:12px;color:var(--text-muted);" id="schools-count"></div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>סמל מ"ח</th><th>שם בית ספר</th><th>שכונה</th><th>שכבה</th><th>מעמד</th><th>איש קשר</th><th>טלפון</th><th>מילא טופס</th><th>מצבת</th><th>טופס</th><th>ספרים יא-יב</th><th></th></tr></thead>
+              <tbody id="tbody-schools"></tbody>
+            </table>
+          </div>
+          <div id="schools-empty" class="empty-state" style="display:none;"><div class="icon">🏫</div><p>לא נמצאו בתי ספר. ייבא קבצים תחילה.</p></div>
+        </div>
+      </div>
+
+      <!-- RESPONSES -->
+      <div class="page" id="page-responses">
+        <div class="grid-2" style="margin-bottom:20px;">
+          <div class="card" style="border-right:4px solid var(--success);">
+            <div class="card-header"><div class="card-title" style="color:var(--success)">✅ מילאו טופס</div><span class="badge success" id="filled-count-badge">0</span></div>
+            <div class="card-body" style="padding:0;">
+              <table><thead><tr><th>סמל</th><th>שם בי"ס</th><th>תאריך מילוי</th><th>סה"כ תלמידים</th></tr></thead>
+              <tbody id="tbody-filled"></tbody></table>
+              <div id="filled-empty" class="empty-state" style="display:none;padding:30px;"><div class="icon">📋</div><p>אין נתונים</p></div>
+            </div>
+          </div>
+          <div class="card" style="border-right:4px solid var(--danger);">
+            <div class="card-header"><div class="card-title" style="color:var(--danger)">❌ לא מילאו טופס</div><span class="badge danger" id="missing-count-badge">0</span></div>
+            <div class="card-body" style="padding:0;">
+              <table><thead><tr><th>סמל</th><th>שם בי"ס</th><th>איש קשר</th><th>מייל</th><th>טלפון</th></tr></thead>
+              <tbody id="tbody-not-filled"></tbody></table>
+              <div id="missing-empty" class="empty-state" style="display:none;padding:30px;"><div class="icon">📋</div><p>אין נתונים</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span style="font-size:13px;font-weight:600;">אחוז מילוי</span>
+              <span style="font-size:13px;color:var(--text-muted);" id="fill-pct-label">0 / 0</span>
+            </div>
+            <div class="progress-bar" style="height:12px;">
+              <div class="progress-fill" id="fill-progress" style="background:var(--success);width:0%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ORDER PAGE -->
+      <div class="page" id="page-order">
+        <div id="order-no-file" class="card" style="margin-bottom:20px;display:block;">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <div style="font-size:28px;">📦</div>
+            <div style="flex:1;">
+              <div style="font-weight:600;margin-bottom:4px;">ייבוא קובץ פירוט להזמנה</div>
+              <div style="font-size:12px;color:var(--text-muted);">העלה את קובץ פירוט להזמנה.xlsx — הנתונים ממולאים אוטומטית מטופסי ה-Fillout</div>
+            </div>
+            <button class="btn btn-primary" onclick="document.getElementById('file-order').click()">📂 בחר קובץ</button>
+            <input type="file" id="file-order" accept=".xlsx,.xls" onchange="loadOrderFile(this.files[0])">
+          </div>
+        </div>
+
+        <div id="order-content" style="display:none;">
+          <div class="merge-banner">
+            <div>
+              <div style="font-weight:600;font-size:14px;">📦 פירוט הזמנה — <span id="order-year-label"></span></div>
+              <div style="font-size:12px;color:var(--primary);margin-top:2px;" id="order-merge-status"></div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="mergeOrderData()">🔄 מזג נתוני טופס</button>
+              <button class="btn btn-outline" onclick="exportOrderXlsx()">📥 פירוט להזמנה (מקורי)</button>
+              <button class="btn btn-success" onclick="exportComprehensive()">📥 ייצוא מקיף</button>
+            </div>
+          </div>
+
+          <div class="stats-row" style="grid-template-columns:repeat(4,1fr);">
+            <div class="stat-card primary"><div class="stat-value" id="ord-total">—</div><div class="stat-label">בתי ספר בהזמנה</div></div>
+            <div class="stat-card success"><div class="stat-value" id="ord-from-form">—</div><div class="stat-label">נתונים מהטופס</div></div>
+            <div class="stat-card warning"><div class="stat-value" id="ord-manual">—</div><div class="stat-label">נתונים ידניים / מצבת</div></div>
+            <div class="stat-card"><div class="stat-value" id="ord-total-students" style="color:var(--text)">—</div><div class="stat-label">סה"כ תלמידים א-י</div></div>
+          </div>
+
+          <div class="filter-bar">
+            <input class="search-input" id="search-order" placeholder="🔍 חיפוש שם / סמל..." oninput="renderOrderTable()">
+            <select class="filter-select" id="filter-order-source" onchange="renderOrderTable()">
+              <option value="">כל המקורות</option>
+              <option value="form">מהטופס</option>
+              <option value="manual">ידני / מצבת</option>
+              <option value="none">אין נתונים</option>
+            </select>
+            <div class="legend">
+              <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div><span>מהטופס</span></div>
+              <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div><span>ידני/מצבת</span></div>
+              <div class="legend-item"><div class="legend-dot" style="background:#e2e8f0"></div><span>חסר</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="table-wrap">
+              <table id="order-main-table">
+                <thead>
+                  <tr>
+                    <th style="position:sticky;right:0;background:var(--bg);">שם בית ספר</th>
+                    <th>סמל</th>
+                    <th>א</th><th>ב</th><th>ג</th><th>ד</th><th>ה</th><th>ו</th>
+                    <th>ז</th><th>ח</th><th>ט</th><th>י</th>
+                    <th>יא</th><th>יב</th>
+                    <th>ספרי יא-יב</th>
+                    <th>מקור</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-order"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORTS -->
+      <div class="page" id="page-reports">
+        <div class="grid-2" style="margin-bottom:20px;">
+          <div class="card">
+            <div class="card-header"><div class="card-title">📈 השוואה מצבת vs טופס</div></div>
+            <div class="card-body"><div class="chart-container"><canvas id="chart-compare"></canvas></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">🍩 מצב מילוי</div></div>
+            <div class="card-body" style="display:flex;align-items:center;justify-content:center;">
+              <div style="display:flex;align-items:center;gap:20px;">
+                <div style="width:160px;height:160px;"><canvas id="chart-donut"></canvas></div>
+                <div>
+                  <div style="font-size:36px;font-weight:700;color:var(--primary);" id="ring-pct">0%</div>
+                  <div style="font-size:12px;color:var(--text-muted);">מילאו את הטופס</div>
+                  <div style="font-size:12px;margin-top:10px;color:var(--text-muted);">
+                    <div>✅ מילאו: <strong id="ring-filled">0</strong></div>
+                    <div>❌ לא מילאו: <strong id="ring-missing">0</strong></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header"><div class="card-title">📑 טבלת תלמידים לפי כיתה</div></div>
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>בית ספר</th><th>סמל</th><th>א</th><th>ב</th><th>ג</th><th>ד</th><th>ה</th><th>ו</th><th>ז</th><th>ח</th><th>ט</th><th>י</th><th>יא</th><th>יב</th><th>סה"כ</th></tr></thead>
+                <tbody id="tbody-grades-summary"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📥 ייצוא</div></div>
+          <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap;">
+            <button class="btn btn-success" onclick="exportComprehensive()">📥 ייצוא מקיף (כולל ספרים + אנשי קשר)</button>
+            <button class="btn btn-outline" onclick="exportMissing()">📤 לא מילאו</button>
+            <button class="btn btn-outline" onclick="exportAll()">📤 כל הנתונים</button>
+            <button class="btn btn-outline" onclick="exportGrades()">📤 נתוני כיתות</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMPORT -->
+      <div class="page" id="page-import">
+        <div class="import-cards">
+          <div class="import-card">
+            <div style="font-size:26px;margin-bottom:6px;">📄</div>
+            <h3>מצבת תלמידים</h3>
+            <p>קובץ Excel עם מספר תלמידים לפי כיתה (שנה קודמת)</p>
+            <div class="upload-zone" id="zone-roster" onclick="document.getElementById('file-roster').click()" ondragover="dragOver(event,'zone-roster')" ondragleave="dragLeave('zone-roster')" ondrop="dropFile(event,'roster')">
+              <div class="icon">📊</div><p><strong>לחץ לבחירת קובץ</strong> או גרור</p><p style="font-size:11px;margin-top:3px;">.xlsx .xls</p>
+            </div>
+            <input type="file" id="file-roster" accept=".xlsx,.xls" onchange="loadRoster(this.files[0])">
+            <div class="status-line" id="status-roster"><span>⭕</span> לא נטען</div>
+          </div>
+
+          <div class="import-card">
+            <div style="font-size:26px;margin-bottom:6px;">📞</div>
+            <h3>רשימת קשר</h3>
+            <p>קובץ Excel עם פרטי בי"ס, מנהל, מייל, טלפון</p>
+            <div class="upload-zone" id="zone-contacts" onclick="document.getElementById('file-contacts').click()" ondragover="dragOver(event,'zone-contacts')" ondragleave="dragLeave('zone-contacts')" ondrop="dropFile(event,'contacts')">
+              <div class="icon">📋</div><p><strong>לחץ לבחירת קובץ</strong> או גרור</p><p style="font-size:11px;margin-top:3px;">.xlsx .xls</p>
+            </div>
+            <input type="file" id="file-contacts" accept=".xlsx,.xls" onchange="loadContacts(this.files[0])">
+            <div class="status-line" id="status-contacts"><span>⭕</span> לא נטען</div>
+          </div>
+
+          <div class="import-card">
+            <div style="font-size:26px;margin-bottom:6px;">📝</div>
+            <h3>תגובות טופס (Fillout)</h3>
+            <p>קובץ CSV עם נתוני תלמידים וספרים עדכניים</p>
+            <div class="upload-zone" id="zone-form" onclick="document.getElementById('file-form').click()" ondragover="dragOver(event,'zone-form')" ondragleave="dragLeave('zone-form')" ondrop="dropFile(event,'form')">
+              <div class="icon">📩</div><p><strong>לחץ לבחירת קובץ</strong> או גרור</p><p style="font-size:11px;margin-top:3px;">.csv</p>
+            </div>
+            <input type="file" id="file-form" accept=".csv" onchange="loadForm(this.files[0])">
+            <div class="status-line" id="status-form"><span>⭕</span> לא נטען</div>
+          </div>
+
+          <div class="import-card" style="border:2px solid var(--success);background:var(--success-light);">
+            <div style="font-size:26px;margin-bottom:6px;">📥</div>
+            <h3>ייצוא מקיף</h3>
+            <p>לאחר ייבוא 3 הקבצים — לחץ לייצא קובץ Excel מלא הכולל את כל הנתונים, אנשי קשר וכמויות ספרים</p>
+            <button class="btn btn-success" onclick="exportComprehensive()" style="width:100%;margin-top:8px;">📥 ייצא עכשיו</button>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">אין צורך בקובץ פירוט להזמנה</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body" style="display:flex;align-items:center;gap:12px;">
+            <label style="font-size:13px;">שנת לימודים:</label>
+            <input type="text" id="year-input" value='תשפ"ו' style="padding:7px 12px;border:1px solid var(--border);border-radius:7px;font-size:14px;width:120px;" oninput="setYear(this.value)">
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- School detail modal -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div style="font-size:16px;font-weight:700;" id="modal-title">—</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="modal-subtitle">—</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Add / Edit School modal -->
+<div class="modal-overlay" id="school-modal" onclick="if(event.target===this)closeSchoolModal()">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div style="font-size:16px;font-weight:700;" id="school-modal-title">🏫 הוסף בית ספר</div>
+      <button class="modal-close" onclick="closeSchoolModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div><label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;">סמל מ"ח *</label>
+          <input id="sm-semel" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;font-size:13px;" placeholder="123456" type="number"></div>
+        <div><label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;">סמל עירוני</label>
+          <input id="sm-semel2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;font-size:13px;" placeholder=""></div>
+      </div>
+      <div style="margin-bottom:12px;"><label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;">שם בית הספר *</label>
+        <input id="sm-name" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;font-size:13px;" placeholder=""></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div><label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;">מעמד</label>
+          <select id="sm-status" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;">
+            <option value="רשמי">רשמי</option><option value="מוכשר">מוכשר</option><option value="">אחר</option>
+          </select></div>
+        <div><label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;">שכבה</label>
+          <input id="sm-level" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;font-size:13px;" placeholder="יסודי / מכין / תיכון..."></div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;margin-top:4px;">תלמידים לפי כיתה (מצבת)</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px;" id="sm-grades-grid"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div><label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;">שם מנהל</label>
+          <input id="sm-principal" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;font-size:13px;" placeholder=""></div>
+        <div><label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;">טלפון</label>
+          <input id="sm-phone" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;font-size:13px;" placeholder="" dir="ltr"></div>
+      </div>
+      <div style="margin-bottom:12px;"><label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;">מייל</label>
+        <input id="sm-email" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;font-size:13px;" placeholder="" dir="ltr"></div>
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;">
+      <button class="btn btn-danger btn-sm" id="school-delete-btn" onclick="deleteSchoolFromModal()" style="display:none;">🗑️ מחק</button>
+      <div style="display:flex;gap:10px;margin-right:auto;">
+        <button class="btn btn-outline" onclick="closeSchoolModal()">ביטול</button>
+        <button class="btn btn-primary" onclick="saveSchoolModal()">💾 שמור</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit form response modal -->
+<div class="modal-overlay" id="edit-modal" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div>
+        <div style="font-size:16px;font-weight:700;" id="edit-modal-title">✏️ עריכת נתונים</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="edit-modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="modal-body" id="edit-modal-body"></div>
+    <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;">
+      <button class="btn btn-danger btn-sm" id="edit-delete-btn" onclick="deleteFormResponse()">🗑️ מחק תגובה</button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-outline" onclick="closeEditModal()">ביטול</button>
+        <button class="btn btn-primary" onclick="saveEditedResponse()">💾 שמור שינויים</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit order row modal -->
+<div class="modal-overlay" id="edit-order-modal" onclick="if(event.target===this)closeEditOrderModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div style="font-size:16px;font-weight:700;" id="edit-order-title">✏️ עריכת שורת הזמנה</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="edit-order-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeEditOrderModal()">✕</button>
+    </div>
+    <div class="modal-body" id="edit-order-body"></div>
+    <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeEditOrderModal()">ביטול</button>
+      <button class="btn btn-primary" onclick="saveEditedOrderRow()">💾 שמור שינויים</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset confirm dialog -->
+<div class="modal-overlay" id="reset-modal" onclick="if(event.target===this)closeResetModal()">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div style="font-size:16px;font-weight:700;">🗑️ איפוס נתונים</div>
+      <button class="modal-close" onclick="closeResetModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;margin-bottom:20px;line-height:1.6;">האם אתה בטוח שברצונך למחוק את <strong>כל הנתונים</strong> שנטענו? פעולה זו אינה הפיכה.</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="closeResetModal()">ביטול</button>
+        <button class="btn btn-danger" onclick="doReset()">🗑️ מחק הכל</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<script>
+// ==================== STATE ====================
+let state = {
+  year: 'תשפ"ו',
+  contacts: [],
+  roster: [],
+  formResponses: [],
+  manualSchools: [],  // manually added/edited schools
+  csvBookHeader: [],  // CSV header row cols 22+ (specializations + books)
+  orderRows: [],
+  orderHeader: [],
+  orderMerged: false,
+};
+
+const GRADE_NAMES = ['א','ב','ג','ד','ה','ו','ז','ח','ט','י','יא','יב'];
+const GRADE_AR = ['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'];
+
+// Column indices in the order xlsx (0-based)
+const ORD = {
+  SEMEL: 0, SEMEL2: 1, NAME: 2, STATUS: 3,
+  ROSTER_START: 4, ROSTER_END: 15,   // cols 4-15 = מצבת grades א-יב
+  TOTAL: 16,
+  FORM_START: 17, FORM_END: 28,      // cols 17-28 = form grades א-יב
+  SPECIALIZATIONS: 29,
+  BOOKS_START: 30, BOOKS_END: 134,   // cols 30-134 = book quantities
+};
+
+// ==================== NAVIGATION ====================
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'"+page+"'")) n.classList.add('active');
+  });
+  const titles = { dashboard:'דשבורד', schools:'בתי ספר', responses:'מילאו / לא מילאו', order:'פירוט הזמנה', reports:'דוחות', import:'ייבוא קבצים' };
+  document.getElementById('topbar-title').textContent = titles[page] || page;
+  if (page === 'dashboard') refreshDashboard();
+  if (page === 'schools') renderSchools();
+  if (page === 'responses') renderResponses();
+  if (page === 'order') renderOrderPage();
+  if (page === 'reports') renderReports();
+}
+
+// ==================== YEAR ====================
+function setYear(val) {
+  state.year = val;
+  document.getElementById('sidebar-year').textContent = val;
+  document.getElementById('topbar-year-val').textContent = val;
+}
+function changeYear() {
+  const v = prompt('הזן שנת לימודים:', state.year);
+  if (v) { document.getElementById('year-input').value = v; setYear(v); }
+}
+
+// ==================== RESET ====================
+function confirmReset() { document.getElementById('reset-modal').classList.add('open'); }
+function closeResetModal() { document.getElementById('reset-modal').classList.remove('open'); }
+function doReset() {
+  state = { year: 'תשפ"ו', contacts: [], roster: [], formResponses: [], manualSchools: [], csvBookHeader: [], orderRows: [], orderHeader: [], orderMerged: false };
+  localStorage.removeItem('textbook_state');
+  ['status-roster','status-contacts','status-form','status-order'].forEach(id => {
+    document.getElementById(id).innerHTML = '<span>⭕</span> לא נטען';
+  });
+  setYear(state.year);
+  document.getElementById('year-input').value = state.year;
+  closeResetModal();
+  navigate('dashboard');
+  notify('כל הנתונים נמחקו');
+}
+
+// ==================== LOAD: ROSTER (MASTER LIST) ====================
+function loadRoster(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+      const header = rows[0];
+      const semelIdx   = header.findIndex(h => h && String(h).includes('סמל משרד'));
+      const semel2Idx  = header.findIndex(h => h && String(h).includes('סמל עירוני'));
+      const nameIdx    = header.findIndex(h => h && String(h).includes('שם בית ספר'));
+      const statusIdx  = header.findIndex(h => h && String(h).includes('מעמד'));
+      const gradeStart = header.findIndex(h => h === 'א');
+      state.roster = [];
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const semel = r[semelIdx];
+        if (!semel) continue;
+        const grades = {};
+        GRADE_NAMES.forEach((g, gi) => {
+          const idx = gradeStart + gi;
+          grades[g] = (idx >= 0 && r[idx] != null && r[idx] !== '') ? Number(r[idx]) : null;
+        });
+        const total = Object.values(grades).reduce((s,v)=>s+(v||0),0);
+        state.roster.push({
+          semel: String(semel).trim(),
+          semel2: semel2Idx >= 0 && r[semel2Idx] ? String(r[semel2Idx]).trim() : '',
+          name: nameIdx >= 0 ? (r[nameIdx]||'').trim() : '',
+          status: statusIdx >= 0 ? (r[statusIdx]||'') : '',
+          grades, total,
+          manual: false, // not manually added
+        });
+      }
+      document.getElementById('status-roster').innerHTML = `<span style="color:var(--success)">✅</span> נטען: ${state.roster.length} בתי ספר`;
+      notify(`מצבת: ${state.roster.length} בתי ספר`); save();
+    } catch(err) { notify('שגיאה: '+err.message,'error'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ==================== LOAD: CONTACTS ====================
+function loadContacts(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+      const header = rows[0];
+      const col = name => header.findIndex(h => h && String(h).includes(name));
+      const semelIdx = col('סמל מ.ח'), nameIdx = col("שם בי''ס"), neighIdx = col('שכונה'),
+            levelIdx = col('שכבה'), statusIdx = col('מעמד'), phoneIdx = col("מס' טל"),
+            emailIdx = col("דו''ל"), principalIdx = col('שם מנהל'),
+            principalPhoneIdx = col('נייד'), principalEmailIdx = col('מייל המנהל'), secretaryIdx = col('שם מזכירה');
+      state.contacts = [];
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const semel = r[semelIdx];
+        if (!semel) continue;
+        state.contacts.push({
+          semel: String(semel).trim(), name: r[nameIdx]||'', neighborhood: r[neighIdx]||'',
+          level: r[levelIdx]||'', status: r[statusIdx]||'', phone: r[phoneIdx] ? String(r[phoneIdx]):'',
+          email: r[emailIdx]||'', principal: r[principalIdx]||'',
+          principalPhone: r[principalPhoneIdx] ? String(r[principalPhoneIdx]):'',
+          principalEmail: r[principalEmailIdx]||'', secretary: r[secretaryIdx]||'',
+        });
+      }
+      document.getElementById('status-contacts').innerHTML = `<span style="color:var(--success)">✅</span> נטען: ${state.contacts.length} בתי ספר`;
+      notify(`רשימת קשר: ${state.contacts.length} בתי ספר`); save();
+    } catch(err) { notify('שגיאה: '+err.message,'error'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ==================== LOAD: FORM CSV ====================
+// CSV structure (0-indexed):
+//  0: semel | 1: date | 2: school name | 3: principal | 4: phone | 5: principal email
+//  6: rep | 7: rep phone | 8: rep email | 9: grade levels present
+//  10-21: student counts per grade | 22: specializations text
+//  23-89: books (numeric) | 90: notes1 (text) | 91-126: books (numeric) | 127: notes2 (text)
+const CSV_NOTES_IDX = new Set([90, 127]);
+
+function loadForm(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const rows = parseCSV(e.target.result);
+      if (rows.length < 2) { notify('הקובץ ריק','error'); return; }
+      const header = rows[0];
+      state.csvBookHeader = header.slice(22); // col 22 = specializations, 23+ = books
+
+      const rawEntries = [];
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const semel = r[0];
+        if (!semel || !semel.trim()) continue;
+        const grades = {};
+        for (let gi = 0; gi < 12; gi++) {
+          const val = r[10 + gi];
+          grades[GRADE_NAMES[gi]] = (val !== '' && val != null && !isNaN(Number(val))) ? Number(val) : null;
+        }
+        const total = Object.values(grades).reduce((s,v)=>s+(v||0),0);
+        rawEntries.push({
+          semel: String(semel).trim(),
+          rawDate: r[1] || '',          // keep raw for sorting
+          date: r[1] ? parseDate(r[1]) : '',
+          // Form contact info (may be more updated than contact list)
+          formSchoolName: r[2] || '',
+          formPrincipal:  r[3] || '',
+          formPhone:      r[4] || '',
+          formEmail:      r[5] || '',
+          formRep:        r[6] || '',
+          formRepPhone:   r[7] || '',
+          formRepEmail:   r[8] || '',
+          gradeLevels:    r[9] || '',   // ابتدائي/اعدادي/ثانوي
+          grades, total,
+          specializations: r[22] || '',
+          rawRow: r,                    // full row for positional book mapping
+        });
+      }
+
+      // DEDUPLICATION: keep latest entry per semel
+      const bySemel = {};
+      for (const entry of rawEntries) {
+        const existing = bySemel[entry.semel];
+        if (!existing || entry.rawDate > existing.rawDate) {
+          bySemel[entry.semel] = entry;
+        }
+      }
+      state.formResponses = Object.values(bySemel);
+
+      const dupeCount = rawEntries.length - state.formResponses.length;
+      document.getElementById('status-form').innerHTML =
+        `<span style="color:var(--success)">✅</span> נטען: ${state.formResponses.length} בתי ספר` +
+        (dupeCount > 0 ? ` <span style="color:var(--warning)">(${dupeCount} כפולים הוסרו)</span>` : '');
+      notify(`טופס: ${state.formResponses.length} בתי ספר${dupeCount>0?' ('+dupeCount+' כפולים — נשמר האחרון)':''}`);
+      save();
+      if (state.orderRows.length > 0) { mergeOrderData(); }
+    } catch(err) { notify('שגיאה: '+err.message,'error'); console.error(err); }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ==================== LOAD: ORDER FILE ====================
+function loadOrderFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellFormula:false, cellNF:false});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // Read as array of arrays (preserve structure)
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+      // Row 0 = section headers, Row 1 = column headers, Row 2+ = data
+      state.orderHeader = (rows[1] || []).map(h => h == null ? null : String(h));
+      state.orderRows = rows.slice(2).filter(r => r && r[0] != null); // data rows only
+      state.orderMerged = false;
+      const el1 = document.getElementById('status-order');
+      const el2 = document.getElementById('status-form'); // won't overwrite
+      if (el1) el1.innerHTML = `<span style="color:var(--success)">✅</span> נטען: ${state.orderRows.length} שורות`;
+      notify(`קובץ הזמנה נטען: ${state.orderRows.length} בתי ספר`);
+      save();
+      navigate('order');
+    } catch(err) { notify('שגיאה: '+err.message,'error'); console.error(err); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ==================== MERGE ORDER + FORM ====================
+// Positional mapping: xlsx book col (30+pos) ↔ CSV book col (23+pos)
+// Both files have exactly 105 book columns in the same order.
+const CSV_BOOKS_OFFSET = 23; // first book col in CSV
+const NOTES_COLS = new Set([97, 134]); // xlsx cols that are free-text notes, not numbers
+
+function mergeOrderData() {
+  if (!state.orderRows.length) { notify('טען קובץ הזמנה תחילה','error'); return; }
+  if (!state.formResponses.length) { notify('טען נתוני טופס תחילה','error'); return; }
+
+  const formMap = {};
+  state.formResponses.forEach(f => { formMap[f.semel] = f; });
+
+  let mergedCount = 0;
+  state.orderRows = state.orderRows.map(row => {
+    const semel = row[ORD.SEMEL] != null ? String(row[ORD.SEMEL]).trim() : null;
+    if (!semel) return row;
+    const form = formMap[semel];
+    if (!form) return row;
+
+    const newRow = [...row];
+    // Grades א-יב (form cols 17-28)
+    GRADE_NAMES.forEach((g, gi) => {
+      newRow[ORD.FORM_START + gi] = form.grades[g] != null ? form.grades[g] : 0;
+    });
+    // Specializations (col 29)
+    newRow[ORD.SPECIALIZATIONS] = form.specializations || '';
+
+    // Book columns (30-134) — positional: xlsx pos = ci - 30, CSV col = pos + 23
+    // Preserve text for notes columns (97, 134)
+    for (let ci = ORD.BOOKS_START; ci <= ORD.BOOKS_END; ci++) {
+      const pos = ci - ORD.BOOKS_START; // 0..104
+      const csvCol = CSV_BOOKS_OFFSET + pos; // 23..127
+      const rawVal = form.rawRow && form.rawRow[csvCol] !== undefined ? form.rawRow[csvCol] : '';
+      if (rawVal === '' || rawVal == null) {
+        newRow[ci] = NOTES_COLS.has(ci) ? '' : 0;
+      } else if (NOTES_COLS.has(ci)) {
+        newRow[ci] = rawVal; // keep as text
+      } else {
+        newRow[ci] = isNaN(Number(rawVal)) ? rawVal : Number(rawVal);
+      }
+    }
+    mergedCount++;
+    return newRow;
+  });
+
+  state.orderMerged = true;
+  notify(`מוזג! ${mergedCount} בתי ספר עודכנו מהטופס`);
+  renderOrderPage();
+}
+
+// ==================== EXPORT ORDER XLSX ====================
+function exportOrderXlsx() {
+  if (!state.orderRows.length) { notify('אין נתוני הזמנה לייצוא','error'); return; }
+
+  const wb = XLSX.utils.book_new();
+  // Row 0: section header
+  const row0 = new Array(state.orderHeader.length).fill(null);
+  row0[4] = 'מצבת תלמידים';
+  row0[17] = 'איסוף נתונים';
+  // Row 1: column header
+  const row1 = [...state.orderHeader];
+  // Data rows
+  const dataRows = state.orderRows;
+
+  const allRows = [row0, row1, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(allRows);
+
+  // Note: notes columns (97,134) contain text — SheetJS handles mixed types per cell automatically
+  XLSX.utils.book_append_sheet(wb, ws, 'רשמי');
+  XLSX.writeFile(wb, `פירוט_להזמנה_מעודכן_${state.year}.xlsx`);
+  notify('הקובץ הורד בהצלחה!');
+}
+
+// ==================== RENDER ORDER PAGE ====================
+function renderOrderPage() {
+  const hasOrder = state.orderRows.length > 0;
+  document.getElementById('order-no-file').style.display = hasOrder ? 'none' : 'block';
+  document.getElementById('order-content').style.display = hasOrder ? 'block' : 'none';
+  if (!hasOrder) return;
+
+  document.getElementById('order-year-label').textContent = state.year;
+
+  const formMap = {};
+  state.formResponses.forEach(f => { formMap[f.semel] = f; });
+
+  // Stats
+  let fromForm = 0, manual = 0, totalStudentsAJ = 0;
+  state.orderRows.forEach(row => {
+    const semel = row[ORD.SEMEL] != null ? String(row[ORD.SEMEL]).trim() : '';
+    const hasFormData = state.orderMerged ? !!formMap[semel] : rowHasFormData(row);
+    if (hasFormData) fromForm++; else manual++;
+    // Sum grades א-י from form cols if available, else roster cols
+    for (let gi = 0; gi <= 9; gi++) {
+      const formCol = ORD.FORM_START + gi;
+      const rosterCol = ORD.ROSTER_START + gi;
+      const v = row[formCol];
+      const rv = row[rosterCol];
+      const use = (v != null && v !== '' && String(v) !== '#N/A') ? Number(v) : (rv != null ? Number(rv) : 0);
+      if (!isNaN(use)) totalStudentsAJ += use;
+    }
+  });
+
+  document.getElementById('ord-total').textContent = state.orderRows.length;
+  document.getElementById('ord-from-form').textContent = fromForm;
+  document.getElementById('ord-manual').textContent = manual;
+  document.getElementById('ord-total-students').textContent = totalStudentsAJ.toLocaleString();
+
+  const merged = state.orderMerged;
+  document.getElementById('order-merge-status').textContent = merged
+    ? `✅ נתוני טופס מוזגו — ${fromForm} בתי ספר עודכנו`
+    : 'לחץ "מזג נתוני טופס" כדי לאחד את נתוני הטופס עם קובץ ההזמנה';
+
+  renderOrderTable();
+}
+
+function rowHasFormData(row) {
+  const v = row[ORD.FORM_START];
+  return v != null && v !== '' && String(v) !== '#N/A' && String(v) !== 'undefined';
+}
+
+function renderOrderTable() {
+  const q = (document.getElementById('search-order').value||'').toLowerCase();
+  const srcFilter = document.getElementById('filter-order-source').value;
+  const formMap = {};
+  state.formResponses.forEach(f => { formMap[f.semel] = f; });
+
+  let rows = state.orderRows;
+  if (q) rows = rows.filter(r => {
+    const name = String(r[ORD.NAME]||'').toLowerCase();
+    const semel = String(r[ORD.SEMEL]||'');
+    return name.includes(q) || semel.includes(q);
+  });
+
+  if (srcFilter === 'form') rows = rows.filter(r => rowHasFormData(r));
+  else if (srcFilter === 'manual') rows = rows.filter(r => !rowHasFormData(r) && hasAnyData(r));
+  else if (srcFilter === 'none') rows = rows.filter(r => !rowHasFormData(r) && !hasAnyData(r));
+
+  const tbody = document.getElementById('tbody-order');
+  tbody.innerHTML = rows.map(row => {
+    const semel = String(row[ORD.SEMEL]||'').trim();
+    const name = row[ORD.NAME]||'';
+    const hasForm = rowHasFormData(row);
+
+    // Grade values: prefer form cols, fallback roster cols
+    const gradeCells = GRADE_NAMES.map((g, gi) => {
+      const formIdx = ORD.FORM_START + gi;
+      const rosterIdx = ORD.ROSTER_START + gi;
+      const fv = row[formIdx];
+      const rv = row[rosterIdx];
+      const isFormVal = fv != null && fv !== '' && String(fv) !== '#N/A';
+      const val = isFormVal ? fv : (rv != null && rv !== '' ? rv : null);
+      if (val == null) return '<td style="text-align:center;color:#ccc;">—</td>';
+      const color = isFormVal ? 'color:var(--success);font-weight:600;' : 'color:#64748b;';
+      return `<td style="text-align:center;${color}">${val}</td>`;
+    });
+
+    // Count non-zero books and notes
+    let bookCount = 0, bookTotal = 0, hasNotes = false;
+    for (let ci = ORD.BOOKS_START; ci <= ORD.BOOKS_END; ci++) {
+      if (NOTES_COLS.has(ci)) {
+        const v = row[ci];
+        if (v && String(v).trim() && String(v) !== '0') hasNotes = true;
+      } else {
+        const v = Number(row[ci]);
+        if (v > 0) { bookCount++; bookTotal += v; }
+      }
+    }
+    const booksCell = (bookCount > 0 || hasNotes)
+      ? `<div style="display:flex;flex-direction:column;gap:3px;">${bookCount>0?`<span class="badge primary" style="font-size:10px;">${bookCount} ספרים · ${bookTotal.toLocaleString()} יח'</span>`:''} ${hasNotes?`<span class="badge warning" style="font-size:10px;">📝 הערות</span>`:''}</div>`
+      : '<span style="color:#ccc;font-size:12px;">—</span>';
+
+    const sourceBadge = hasForm
+      ? '<span class="badge success" style="font-size:10px;">טופס</span>'
+      : '<span class="badge manual" style="font-size:10px;">ידני/מצבת</span>';
+
+    return `<tr>
+      <td style="font-weight:500;position:sticky;right:0;background:#fff;min-width:180px;">${name}</td>
+      <td><span class="badge gray" style="font-size:11px;">${semel}</span></td>
+      ${gradeCells.join('')}
+      ${booksCell}
+      ${sourceBadge}
+      <td style="white-space:nowrap;"><button class="btn btn-sm btn-outline" onclick="showOrderDetail('${semel}')">פרטים</button> <button class="btn btn-sm btn-outline" onclick="openEditOrder('${semel}')" style="color:var(--primary);">✏️</button></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="18" style="text-align:center;padding:30px;color:var(--text-muted);">אין נתונים להצגה</td></tr>`;
+}
+
+function hasAnyData(row) {
+  for (let gi = 0; gi < 12; gi++) {
+    const rv = row[ORD.ROSTER_START + gi];
+    if (rv != null && rv !== '') return true;
+  }
+  return false;
+}
+
+// ==================== ORDER DETAIL MODAL ====================
+function showOrderDetail(semel) {
+  const row = state.orderRows.find(r => String(r[ORD.SEMEL]||'').trim() === semel);
+  if (!row) return;
+  const name = row[ORD.NAME]||semel;
+  const hasForm = rowHasFormData(row);
+  const specs = row[ORD.SPECIALIZATIONS];
+
+  document.getElementById('modal-title').textContent = name;
+  document.getElementById('modal-subtitle').textContent = `סמל: ${semel} | מקור: ${hasForm ? 'נתוני טופס' : 'ידני / מצבת'}`;
+
+  // Grades section
+  let html = `<div style="margin-bottom:20px;">
+    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">תלמידים לפי כיתה</div>
+    <div class="grade-grid">`;
+  GRADE_NAMES.forEach((g, gi) => {
+    const fv = row[ORD.FORM_START + gi];
+    const rv = row[ORD.ROSTER_START + gi];
+    const isForm = fv != null && fv !== '' && String(fv) !== '#N/A';
+    const val = isForm ? fv : (rv != null && rv !== '' ? rv : null);
+    if (val == null) return;
+    html += `<div class="grade-box ${isForm ? 'form-data' : 'roster-data'}">
+      <div class="grade-name">כיתה ${g}</div>
+      <div class="grade-count">${val}</div>
+      <div class="grade-prev">${isForm ? '📝 טופס' : '📋 מצבת'}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Books section (יא-יב) — separate numeric books from notes
+  const bookRows = [], noteRows = [];
+  for (let ci = ORD.BOOKS_START; ci <= ORD.BOOKS_END; ci++) {
+    const v = row[ci];
+    const colName = state.orderHeader[ci] || `עמודה ${ci}`;
+    if (NOTES_COLS.has(ci)) {
+      if (v != null && v !== '' && v !== 0 && String(v) !== '0') {
+        noteRows.push({ name: colName, text: String(v) });
+      }
+    } else {
+      const num = v != null && v !== '' && String(v) !== '#N/A' ? Number(v) : 0;
+      if (num > 0) bookRows.push({ name: colName, qty: num });
+    }
+  }
+
+  if (specs) {
+    html += `<div style="margin-bottom:12px;font-size:12px;background:var(--bg);padding:10px 14px;border-radius:8px;">
+      <strong>מגמות:</strong> ${specs}
+    </div>`;
+  }
+
+  if (bookRows.length > 0) {
+    html += `<div style="font-weight:600;font-size:13px;margin-bottom:8px;">ספרי יא-יב (${bookRows.length} ספרים, ${bookRows.reduce((s,b)=>s+b.qty,0).toLocaleString()} יח')</div>
+    <div class="table-wrap" style="max-height:320px;overflow-y:auto;"><table class="books-table">
+      <thead><tr><th>שם הספר</th><th style="text-align:center;">כמות</th></tr></thead>
+      <tbody>${bookRows.map(b => `<tr>
+        <td class="book-name" dir="rtl">${b.name}</td>
+        <td class="qty">${b.qty.toLocaleString()}</td>
+      </tr>`).join('')}</tbody>
+      <tfoot><tr><td style="font-weight:700;">סה"כ יחידות</td><td class="qty" style="font-weight:700;">${bookRows.reduce((s,b)=>s+b.qty,0).toLocaleString()}</td></tr></tfoot>
+    </table></div>`;
+  } else {
+    html += `<div style="font-size:13px;color:var(--text-muted);padding:12px 0;">אין ספרים לכיתות יא-יב עם כמות > 0</div>`;
+  }
+
+  if (noteRows.length > 0) {
+    html += `<div style="margin-top:14px;"><div style="font-weight:600;font-size:13px;margin-bottom:6px;">📝 הערות / כתבים אחרים</div>`;
+    noteRows.forEach(n => {
+      html += `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:10px 14px;margin-bottom:6px;font-size:12px;direction:rtl;">
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">${n.name}</div>
+        <div>${n.text}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+    <button class="btn btn-outline btn-sm" onclick="openEditOrder('${semel}')">✏️ ערוך שורת הזמנה</button>
+  </div>`;
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal').classList.add('open');
+}
+
+// ==================== COMPUTED DATA ====================
+function getMergedSchools() {
+  // Master list = roster. Contact list and form are supplementary.
+  const contactMap = {};
+  state.contacts.forEach(c => { contactMap[c.semel] = c; });
+  const formMap = {};
+  state.formResponses.forEach(f => { formMap[f.semel] = f; });
+
+  // Include manual schools (state.manualSchools) in the roster view
+  const allRoster = [...state.roster, ...(state.manualSchools||[])];
+
+  return allRoster.map(r => {
+    const c = contactMap[r.semel] || {};
+    const f = formMap[r.semel] || null;
+    // For manual schools, r may carry its own contact info
+    return {
+      semel:          r.semel,
+      semel2:         r.semel2 || c.semel2 || '',
+      name:           r.name || c.name || '',
+      status:         r.status || c.status || '',
+      manual:         !!r.manual,
+      // Contact: manual overrides > contact list
+      neighborhood:   r.neighborhood || c.neighborhood || '',
+      level:          r.level || c.level || '',
+      phone:          r.phone || c.phone || '',
+      email:          r.email || c.email || '',
+      principal:      r.principal || c.principal || '',
+      principalPhone: r.principalPhone || c.principalPhone || '',
+      principalEmail: r.principalEmail || c.principalEmail || '',
+      secretary:      r.secretary || c.secretary || '',
+      address:        r.address || c.address || '',
+      // Roster grades
+      rosterGrades: r.grades || null,
+      rosterTotal:  r.total || 0,
+      // Form response (deduplicated, latest)
+      formResponse: f,
+      filled: !!f,
+    };
+  });
+}
+
+function getUniqueLevels() {
+  const levels = new Set(state.contacts.map(c => c.level).filter(Boolean));
+  return [...levels].sort();
+}
+
+// ==================== DASHBOARD ====================
+let chartResponseBar, chartGradeBar;
+function refreshDashboard() {
+  const schools = getMergedSchools();
+  const total = schools.length, filled = schools.filter(s=>s.filled).length, missing = total-filled;
+  const formTotal = state.formResponses.reduce((s,f)=>s+f.total,0);
+
+  document.getElementById('stat-total').textContent = total||'—';
+  document.getElementById('stat-filled').textContent = filled;
+  document.getElementById('stat-missing').textContent = missing;
+  document.getElementById('stat-students').textContent = formTotal>0?formTotal.toLocaleString():'—';
+  document.getElementById('stat-filled-pct').textContent = total?Math.round(filled/total*100)+'%':'0%';
+  document.getElementById('stat-missing-pct').textContent = total?Math.round(missing/total*100)+'%':'0%';
+
+  const recent = [...state.formResponses].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  document.getElementById('tbody-recent').innerHTML = recent.map(f => {
+    const sc = schools.find(s=>s.semel===f.semel);
+    return `<tr><td>${sc?sc.name:f.name}</td><td><span class="badge gray">${f.semel}</span></td><td>${f.date}</td><td><strong>${f.total.toLocaleString()}</strong></td></tr>`;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">אין נתונים</td></tr>';
+
+  document.getElementById('tbody-missing-preview').innerHTML = schools.filter(s=>!s.filled).slice(0,6).map(s =>
+    `<tr><td>${s.name}</td><td><span class="badge gray">${s.semel}</span></td><td>${s.principal||'—'}</td><td dir="ltr">${s.principalPhone||s.phone||'—'}</td></tr>`
+  ).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">כולם מילאו!</td></tr>';
+
+  const levels = ['יסודי','מכין','מקיף'];
+  const levelData = levels.map(lv => { const g=schools.filter(s=>s.level&&s.level.includes(lv)); return{total:g.length,filled:g.filter(s=>s.filled).length}; });
+  if (chartResponseBar) chartResponseBar.destroy();
+  chartResponseBar = new Chart(document.getElementById('chart-response-bar').getContext('2d'), {
+    type:'bar', data:{labels:levels,datasets:[{label:'מילאו',data:levelData.map(d=>d.filled),backgroundColor:'#22a06b'},{label:'לא מילאו',data:levelData.map(d=>d.total-d.filled),backgroundColor:'#e03131'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}
+  });
+
+  const gradeData = GRADE_NAMES.map(g=>state.formResponses.reduce((s,f)=>s+(f.grades[g]||0),0));
+  if (chartGradeBar) chartGradeBar.destroy();
+  chartGradeBar = new Chart(document.getElementById('chart-grade-bar').getContext('2d'), {
+    type:'bar', data:{labels:GRADE_NAMES.map(g=>'כיתה '+g),datasets:[{label:'תלמידים',data:gradeData,backgroundColor:'#3b6fc4'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+  });
+}
+
+// ==================== SCHOOLS ====================
+function renderSchools() {
+  // Populate dynamic filters on first call
+  const lvSel = document.getElementById('filter-level');
+  if (lvSel.options.length <= 1) {
+    getUniqueLevels().forEach(lv => {
+      const o = document.createElement('option'); o.value = lv; o.textContent = lv; lvSel.appendChild(o);
+    });
+  }
+  const stSel = document.getElementById('filter-status-school');
+  if (stSel.options.length <= 1) {
+    const statuses = [...new Set(state.roster.map(r=>r.status).filter(Boolean))].sort();
+    statuses.forEach(st => {
+      const o = document.createElement('option'); o.value = st; o.textContent = st; stSel.appendChild(o);
+    });
+  }
+
+  const q = (document.getElementById('search-schools').value||'').toLowerCase();
+  const sf = document.getElementById('filter-status').value;
+  const lf = lvSel.value;
+  const stf = stSel.value;
+  let schools = getMergedSchools();
+  if (q) schools = schools.filter(s=>s.name.toLowerCase().includes(q)||s.semel.includes(q)||(s.neighborhood||'').toLowerCase().includes(q));
+  if (sf==='filled')   schools = schools.filter(s=>s.filled);
+  if (sf==='missing')  schools = schools.filter(s=>!s.filled);
+  if (lf)  schools = schools.filter(s=>s.level===lf);
+  if (stf) schools = schools.filter(s=>s.status===stf);
+  document.getElementById('schools-count').textContent = schools.length+' בתי ספר';
+  if (schools.length===0 && state.roster.length===0) {
+    document.getElementById('schools-empty').style.display='block';
+    document.getElementById('tbody-schools').innerHTML=''; return;
+  }
+  document.getElementById('schools-empty').style.display='none';
+  document.getElementById('tbody-schools').innerHTML = schools.map(s=>{
+    const ft = s.formResponse ? s.formResponse.total : null;
+    const diff = ft!=null && s.rosterTotal!=null ? ft-s.rosterTotal : null;
+    const ds = diff!=null ? `<span style="color:${diff>=0?'var(--success)':'var(--danger)'};">${diff>0?'+':''}${diff}</span>` : '—';
+    // Best contact info: prefer form > contact list
+    const f = s.formResponse;
+    const phone = (f&&f.formPhone) || s.principalPhone || s.phone || '—';
+    const email = (f&&f.formEmail) || s.principalEmail || s.email || '—';
+    const principal = (f&&f.formPrincipal) || s.principal || '—';
+    const hasBooks = f && f.rawRow && f.rawRow.slice(23).some(v=>v&&v!=='0'&&v!=='');
+    return `<tr>
+      <td><span class="badge gray" style="font-size:11px;">${s.semel}</span></td>
+      <td style="font-weight:500;">${s.name}${s.manual?'<span class="badge warning" style="font-size:10px;margin-right:6px;">ידני</span>':''}</td>
+      <td>${s.neighborhood||'—'}</td>
+      <td>${s.level||'—'}</td>
+      <td><span class="badge gray" style="font-size:10px;">${s.status||'—'}</span></td>
+      <td>${principal}</td>
+      <td dir="ltr" style="font-size:12px;">${phone}</td>
+      <td>${s.filled?'<span class="badge success">✅ מילא</span>':'<span class="badge danger">❌ לא מילא</span>'}</td>
+      <td style="text-align:center;">${s.rosterTotal!=null?s.rosterTotal.toLocaleString():'—'}</td>
+      <td style="text-align:center;">${ft!=null?ft.toLocaleString():'—'} ${ds}</td>
+      <td style="text-align:center;">${hasBooks?'<span class="badge primary" style="font-size:10px;">📚 ספרים</span>':'—'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-sm btn-outline" onclick='showSchoolDetail("${s.semel}")'>פרטים</button>
+        <button class="btn btn-sm btn-outline" onclick='openEditSchoolModal("${s.semel}")' style="color:var(--primary);" title="ערוך">✏️</button>
+        ${s.manual?`<button class="btn btn-sm btn-outline" onclick='deleteManualSchool("${s.semel}")' style="color:var(--danger);" title="מחק">🗑️</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ==================== RESPONSES ====================
+function renderResponses() {
+  const schools = getMergedSchools();
+  const filled = schools.filter(s=>s.filled), missing = schools.filter(s=>!s.filled);
+  document.getElementById('filled-count-badge').textContent = filled.length;
+  document.getElementById('missing-count-badge').textContent = missing.length;
+  const pct = schools.length?Math.round(filled.length/schools.length*100):0;
+  document.getElementById('fill-pct-label').textContent = `${filled.length} / ${schools.length}`;
+  document.getElementById('fill-progress').style.width = pct+'%';
+  const tbF = document.getElementById('tbody-filled');
+  if(!filled.length){tbF.innerHTML='';document.getElementById('filled-empty').style.display='block';}
+  else{document.getElementById('filled-empty').style.display='none';tbF.innerHTML=[...filled].sort((a,b)=>(b.formResponse?.date||'').localeCompare(a.formResponse?.date||'')).map(s=>`<tr><td><span class="badge gray">${s.semel}</span></td><td>${s.name}</td><td>${s.formResponse?.date||'—'}</td><td><strong>${s.formResponse?.total?.toLocaleString()||'—'}</strong></td></tr>`).join('');}
+  const tbM = document.getElementById('tbody-not-filled');
+  if(!missing.length){tbM.innerHTML='';document.getElementById('missing-empty').style.display='block';}
+  else{document.getElementById('missing-empty').style.display='none';tbM.innerHTML=missing.map(s=>`<tr><td><span class="badge gray">${s.semel}</span></td><td>${s.name}</td><td>${s.principal||'—'}</td><td><a href="mailto:${s.principalEmail||s.email}" style="color:var(--primary);">${s.principalEmail||s.email||'—'}</a></td><td dir="ltr">${s.principalPhone||s.phone||'—'}</td></tr>`).join('');}
+}
+
+// ==================== REPORTS ====================
+let chartCompare, chartDonut;
+function renderReports() {
+  const schools = getMergedSchools();
+  const filled=schools.filter(s=>s.filled).length, missing=schools.length-filled;
+  const pct=schools.length?Math.round(filled/schools.length*100):0;
+  document.getElementById('ring-pct').textContent=pct+'%';
+  document.getElementById('ring-filled').textContent=filled;
+  document.getElementById('ring-missing').textContent=missing;
+  if(chartDonut)chartDonut.destroy();
+  chartDonut=new Chart(document.getElementById('chart-donut').getContext('2d'),{type:'doughnut',data:{labels:['מילאו','לא מילאו'],datasets:[{data:[filled,missing],backgroundColor:['#22a06b','#e03131'],borderWidth:0}]},options:{responsive:false,plugins:{legend:{display:false}},cutout:'70%'}});
+  const both=schools.filter(s=>s.rosterTotal!=null&&s.formResponse).slice(0,20);
+  if(chartCompare)chartCompare.destroy();
+  chartCompare=new Chart(document.getElementById('chart-compare').getContext('2d'),{type:'bar',data:{labels:both.length?both.map(s=>s.name.length>16?s.name.slice(0,16)+'…':s.name):['אין נתונים'],datasets:[{label:'מצבת',data:both.map(s=>s.rosterTotal),backgroundColor:'#94a3b8'},{label:'טופס',data:both.map(s=>s.formResponse.total),backgroundColor:'#3b6fc4'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}});
+  const fbody=document.getElementById('tbody-grades-summary');
+  fbody.innerHTML=schools.filter(s=>s.formResponse).map(s=>{const g=s.formResponse.grades;return`<tr><td style="font-weight:500;">${s.name}</td><td><span class="badge gray">${s.semel}</span></td>${GRADE_NAMES.map(gn=>`<td style="text-align:center;">${g[gn]!=null?g[gn]:'—'}</td>`).join('')}<td style="font-weight:700;color:var(--primary);">${s.formResponse.total.toLocaleString()}</td></tr>`;}).join('')||'<tr><td colspan="15" style="text-align:center;color:var(--text-muted);padding:30px;">אין נתונים</td></tr>';
+}
+
+// ==================== SCHOOL DETAIL MODAL ====================
+function showSchoolDetail(semel) {
+  const schools = getMergedSchools();
+  const s = schools.find(x => x.semel === semel);
+  if (!s) return;
+  const f = s.formResponse;
+  document.getElementById('modal-title').textContent = s.name;
+  document.getElementById('modal-subtitle').textContent =
+    `סמל מ"ח: ${s.semel}${s.semel2?' | עירוני: '+s.semel2:''} | ${s.level||s.status||''} | מעמד: ${s.status||'—'}`;
+
+  let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">`;
+  // Contact list card
+  html += `<div class="card" style="padding:14px;">
+    <div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:8px;">📞 רשימת קשר</div>
+    <div style="font-size:12px;line-height:2;">
+      <div>👤 ${s.principal||'—'}</div>
+      <div>📞 <span dir="ltr">${s.principalPhone||s.phone||'—'}</span></div>
+      <div>📧 <a href="mailto:${s.principalEmail||s.email}" style="color:var(--primary);word-break:break-all;">${s.principalEmail||s.email||'—'}</a></div>
+      ${s.secretary?`<div>🗂️ ${s.secretary}</div>`:''}
+      <div>📍 ${s.neighborhood||'—'}</div>
+    </div></div>`;
+  // Form contact card
+  if (f) {
+    html += `<div class="card" style="padding:14px;border:1px solid var(--success);">
+      <div style="font-size:10px;color:var(--success);font-weight:700;text-transform:uppercase;margin-bottom:8px;">📝 מהטופס (${f.date})</div>
+      <div style="font-size:12px;line-height:2;">
+        <div>👤 ${f.formPrincipal||'—'}</div>
+        <div>📞 <span dir="ltr">${f.formPhone||'—'}</span></div>
+        <div>📧 <a href="mailto:${f.formEmail}" style="color:var(--primary);word-break:break-all;">${f.formEmail||'—'}</a></div>
+        ${f.formRep?`<div>🤝 ${f.formRep} <span dir="ltr">${f.formRepPhone||''}</span></div>`:''}
+        ${f.gradeLevels?`<div>🏫 ${f.gradeLevels}</div>`:''}
+      </div></div>`;
+  } else {
+    html += `<div class="card" style="padding:14px;">
+      <div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:8px;">סטטוס טופס</div>
+      <div class="badge danger" style="font-size:13px;padding:6px 12px;">❌ לא מילא טופס</div>
+      ${s.rosterTotal?`<div style="margin-top:10px;font-size:12px;color:var(--text-muted);">📋 מצבת: ${s.rosterTotal.toLocaleString()} תלמידים</div>`:''}
+    </div>`;
+  }
+  html += `</div>`;
+
+  // Grades
+  html += `<div style="font-size:13px;font-weight:600;margin-bottom:8px;">תלמידים לפי כיתה</div><div class="grade-grid" style="margin-bottom:16px;">`;
+  GRADE_NAMES.forEach(g => {
+    const fv = f ? f.grades[g] : null, rv = s.rosterGrades ? s.rosterGrades[g] : null;
+    if (fv==null && rv==null) return;
+    html += `<div class="grade-box ${fv!=null?'form-data':'roster-data'}">
+      <div class="grade-name">כיתה ${g}</div>
+      <div class="grade-count">${fv!=null?fv:'—'}</div>
+      ${rv!=null?`<div class="grade-prev">מצבת: ${rv}</div>`:''}
+    </div>`;
+  });
+  html += `</div>`;
+
+  // יא-יב books — uses getBooksFromFormRow (robust, works even if csvBookHeader lost from cache)
+  if (f) {
+    const { bookRows, noteRows, specializations } = getBooksFromFormRow(f);
+    if (specializations) {
+      html += `<div style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;"><strong>מגמות:</strong> ${specializations}</div>`;
+    }
+    if (bookRows.length > 0) {
+      html += `<div style="font-size:13px;font-weight:600;margin-bottom:8px;">📚 ספרי יא-יב — ${bookRows.length} ספרים / ${bookRows.reduce((s,b)=>s+b.qty,0).toLocaleString()} יח'</div>
+      <div class="table-wrap" style="max-height:280px;overflow-y:auto;margin-bottom:12px;">
+      <table class="books-table"><thead><tr><th>שם הספר</th><th style="text-align:center;width:70px;">כמות</th></tr></thead>
+      <tbody>${bookRows.map(b=>`<tr><td dir="rtl" style="font-size:12px;">${b.name}</td><td class="qty">${b.qty.toLocaleString()}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td style="font-weight:700;">סה"כ יחידות</td><td class="qty" style="font-weight:700;">${bookRows.reduce((s,b)=>s+b.qty,0).toLocaleString()}</td></tr></tfoot>
+      </table></div>`;
+    } else {
+      html += `<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;padding:8px 0;">אין ספרים יא-יב (יסודי / מכין)</div>`;
+    }
+    if (noteRows.length > 0) {
+      html += `<div style="font-size:13px;font-weight:600;margin-bottom:6px;">📝 הערות</div>`;
+      noteRows.forEach(n => {
+        html += `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:8px 12px;margin-bottom:6px;font-size:12px;direction:rtl;">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;">${n.name}</div><div>${n.text}</div></div>`;
+      });
+    }
+  }
+
+  html += `<div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+    <button class="btn btn-outline btn-sm" onclick="openEditSchoolModal('${semel}')">✏️ ערוך בית ספר</button>
+    <button class="btn btn-outline btn-sm" onclick="openEditForm('${semel}')">📝 ערוך נתוני טופס</button>
+  </div>`;
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+// ==================== BOOKS HELPER ====================
+// Robust: reads rawRow[23..127], uses csvBookHeader or orderHeader or generic names
+// Works even if csvBookHeader was lost from localStorage
+function getBookColNames() {
+  // Priority 1: CSV book header (set by loadForm)
+  if (state.csvBookHeader && state.csvBookHeader.length > 1) {
+    // csvBookHeader[0]=specializations, [1..]=books → return [1..]
+    return state.csvBookHeader.slice(1);
+  }
+  // Priority 2: Order file header (cols 30–134)
+  if (state.orderHeader && state.orderHeader.length > ORD.BOOKS_END) {
+    return state.orderHeader.slice(ORD.BOOKS_START, ORD.BOOKS_END + 1);
+  }
+  // Priority 3: Try to recover from first formResponse that has rawRow
+  // (we know col 26 = اللغة العربية (المسار المهني) etc., but we can't recover names without header)
+  // Return null to indicate "no names available"
+  return null;
+}
+
+function getBooksFromFormRow(f) {
+  // Returns { bookRows:[{name,qty}], noteRows:[{name,text}], specializations }
+  if (!f || !f.rawRow) return { bookRows:[], noteRows:[], specializations: f ? (f.specializations||'') : '' };
+
+  const specializations = f.rawRow[22] || f.specializations || '';
+  const colNames = getBookColNames(); // may be null
+
+  const bookRows = [], noteRows = [];
+  const rawLen = Math.min(f.rawRow.length, 128);
+  for (let csvIdx = 23; csvIdx < rawLen; csvIdx++) {
+    const val = f.rawRow[csvIdx];
+    if (val == null || val === '') continue;
+    const pos = csvIdx - 23; // 0-indexed book position
+    const colName = colNames ? (colNames[pos] || `ספר ${pos+1}`) : `[עמודה ${csvIdx}]`;
+    if (CSV_NOTES_IDX.has(csvIdx)) {
+      if (String(val) !== '0') noteRows.push({ name: colName, text: String(val) });
+    } else {
+      const num = Number(val);
+      if (!isNaN(num) && num > 0) bookRows.push({ name: colName, qty: num });
+    }
+  }
+  return { bookRows, noteRows, specializations };
+}
+
+// ==================== DRAG & DROP ====================
+function dragOver(e,zone){e.preventDefault();document.getElementById(zone).classList.add('drag');}
+function dragLeave(zone){document.getElementById(zone).classList.remove('drag');}
+function dropFile(e,type){e.preventDefault();const zone='zone-'+type;document.getElementById(zone).classList.remove('drag');const f=e.dataTransfer.files[0];if(!f)return;if(type==='roster')loadRoster(f);if(type==='contacts')loadContacts(f);if(type==='form')loadForm(f);if(type==='order')loadOrderFile(f);}
+
+// ==================== EXPORTS ====================
+// ==================== COMPREHENSIVE EXPORT ====================
+// Uses getMergedSchools() (roster = master) + form contact info + all book data from CSV
+function exportComprehensive() {
+  // Build the header row
+  const schools = getMergedSchools(); // roster = master list
+
+  // Book column names — use robust helper (same priority as getBooksFromFormRow)
+  const bookColNames = getBookColNames() || [];
+
+  const header = [
+    // Identity + contact list
+    'סמל מ"ח','סמל עירוני','שם בית ספר','מעמד','שכבה','שכונה',
+    'שם מנהל (קשר)','נייד מנהל (קשר)','מייל מנהל (קשר)','שם מזכירה','טל\' בי"ס','מייל בי"ס',
+    // Form contact info
+    'שם מנהל (טופס)','טלפון (טופס)','מייל (טופס)','נציג (טופס)','טל\' נציג (טופס)','מייל נציג (טופס)',
+    'שכבות בבית הספר',
+    // Grades
+    ...GRADE_NAMES.map(g=>`מצבת כיתה ${g}`), 'סה"כ מצבת',
+    ...GRADE_NAMES.map(g=>`טופס כיתה ${g}`), 'סה"כ טופס',
+    'הפרש','תאריך טופס','מקור',
+    // יא-יב
+    'מגמות (יא-יב)',
+    ...bookColNames,
+  ];
+
+  const rows = [header];
+
+  schools.forEach(s => {
+    const f = s.formResponse;
+
+    // Roster grades
+    const rosterGrades = GRADE_NAMES.map(g => s.rosterGrades ? (s.rosterGrades[g]!=null?s.rosterGrades[g]:'') : '');
+
+    // Form grades + totals
+    let formGrades = GRADE_NAMES.map(()=>''), formTotal='', diff='', formDate='', source='לא מילא';
+    if (f) {
+      formGrades = GRADE_NAMES.map(g => f.grades[g]!=null ? f.grades[g] : 0);
+      formTotal  = f.total;
+      diff       = s.rosterTotal!=null ? formTotal - s.rosterTotal : '';
+      formDate   = f.date;
+      source     = 'טופס מקוון';
+    }
+
+    // Book quantities — positional: bookColNames[pos] → rawRow[23+pos]
+    const { bookRows: _br, noteRows: _nr, specializations: _sp } = f ? getBooksFromFormRow(f) : {bookRows:[],noteRows:[],specializations:''};
+    // Build qty map by column name for export
+    const bookQtyByName = {};
+    if (f && f.rawRow) {
+      for (let pos = 0; pos < bookColNames.length; pos++) {
+        const csvIdx = 23 + pos;
+        const v = f.rawRow[csvIdx];
+        if (v == null || v === '') { bookQtyByName[bookColNames[pos]] = CSV_NOTES_IDX.has(csvIdx)?'':0; }
+        else bookQtyByName[bookColNames[pos]] = CSV_NOTES_IDX.has(csvIdx) ? String(v) : (isNaN(Number(v))?String(v):Number(v)||0);
+      }
+    }
+    const bookQtys = bookColNames.map(n => bookQtyByName[n] !== undefined ? bookQtyByName[n] : 0);
+
+    rows.push([
+      s.semel, s.semel2||'', s.name, s.status||'', s.level||'', s.neighborhood||'',
+      s.principal||'', s.principalPhone||s.phone||'', s.principalEmail||s.email||'',
+      s.secretary||'', s.phone||'', s.email||'',
+      f?f.formPrincipal:'', f?f.formPhone:'', f?f.formEmail:'',
+      f?f.formRep:'', f?f.formRepPhone:'', f?f.formRepEmail:'',
+      f?f.gradeLevels:'',
+      ...rosterGrades, s.rosterTotal||'',
+      ...formGrades, formTotal, diff, formDate, source,
+      _sp,
+      ...bookQtys,
+    ]);
+  });
+
+  // Create workbook with styled header
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Set column widths
+  ws['!cols'] = [
+    {wch:12},{wch:10},{wch:28},{wch:8},{wch:14},{wch:8},
+    {wch:20},{wch:14},{wch:28},{wch:16},{wch:14},{wch:28},{wch:20},
+    ...GRADE_NAMES.map(()=>({wch:8})), {wch:10},
+    ...GRADE_NAMES.map(()=>({wch:8})), {wch:10},{wch:8},{wch:12},{wch:14},
+    {wch:24},
+    ...bookColNames.map(()=>({wch:10})),
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'פירוט מלא');
+  const filename = `ייצוא_מקיף_${state.year}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  notify(`הקובץ הורד: ${filename}`);
+}
+
+function exportMissing(){const s=getMergedSchools().filter(s=>!s.filled);exportExcel([['סמל מ"ח','שם בי"ס','שכונה','שכבה','שם מנהל','טלפון','מייל'],...s.map(s=>[s.semel,s.name,s.neighborhood,s.level,s.principal,s.principalPhone||s.phone,s.principalEmail||s.email])],'לא_מילאו_טופס.xlsx');}
+function exportAll(){const s=getMergedSchools();exportExcel([['סמל מ"ח','שם בי"ס','שכונה','שכבה','מעמד','שם מנהל','טלפון','מייל','מילא טופס','תלמידים מצבת','תלמידים טופס'],...s.map(s=>[s.semel,s.name,s.neighborhood,s.level,s.status,s.principal,s.principalPhone||s.phone,s.principalEmail||s.email,s.filled?'כן':'לא',s.rosterTotal||'',s.formResponse?.total||''])],'כל_בתי_הספר.xlsx');}
+function exportGrades(){const s=getMergedSchools().filter(s=>s.formResponse);exportExcel([['סמל מ"ח','שם בי"ס',...GRADE_NAMES,'סה"כ'],...s.map(s=>{const g=s.formResponse.grades;return[s.semel,s.name,...GRADE_NAMES.map(gn=>g[gn]!=null?g[gn]:''),s.formResponse.total];})],'נתוני_כיתות.xlsx');}
+function exportExcel(rows,filename){const ws=XLSX.utils.aoa_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'נתונים');XLSX.writeFile(wb,filename);}
+
+// ==================== CSV PARSER ====================
+function parseCSV(text){const rows=[];let row=[],cell='',inQ=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(inQ&&text[i+1]==='"'){cell+='"';i++;}else inQ=!inQ;}else if(c===','&&!inQ){row.push(cell);cell='';}else if((c==='\n'||c==='\r')&&!inQ){row.push(cell);cell='';if(row.some(x=>x))rows.push(row);row=[];if(c==='\r'&&text[i+1]==='\n')i++;}else cell+=c;}if(cell||row.length){row.push(cell);if(row.some(x=>x))rows.push(row);}return rows;}
+function parseDate(str){const m=str.match(/(\w+)\s+(\w+)\s+(\d+)\s+(\d+)/);if(!m)return str;const mo={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};return`${m[4]}-${mo[m[2]]||'??'}-${m[3].padStart(2,'0')}`;}
+
+// ==================== PERSIST ====================
+function save(){try{localStorage.setItem('textbook_state',JSON.stringify({contacts:state.contacts,roster:state.roster,formResponses:state.formResponses,manualSchools:state.manualSchools,csvBookHeader:state.csvBookHeader,orderRows:state.orderRows,orderHeader:state.orderHeader,orderMerged:state.orderMerged,year:state.year}));}catch(e){}}
+function load(){try{const d=localStorage.getItem('textbook_state');if(d){const p=JSON.parse(d);state.contacts=p.contacts||[];state.roster=p.roster||[];state.formResponses=p.formResponses||[];state.manualSchools=p.manualSchools||[];state.csvBookHeader=p.csvBookHeader||[];state.orderRows=p.orderRows||[];state.orderHeader=p.orderHeader||[];state.orderMerged=p.orderMerged||false;state.year=p.year||state.year;if(state.contacts.length)document.getElementById('status-contacts').innerHTML=`<span style="color:var(--success)">✅</span> נטען: ${state.contacts.length} בתי ספר`;if(state.roster.length)document.getElementById('status-roster').innerHTML=`<span style="color:var(--success)">✅</span> נטען: ${state.roster.length} בתי ספר`;if(state.formResponses.length)document.getElementById('status-form').innerHTML=`<span style="color:var(--success)">✅</span> נטען: ${state.formResponses.length} תגובות${state.formResponses.length>0?' (כפולים הוסרו)':''}`;if(state.orderRows.length)document.getElementById('status-order').innerHTML=`<span style="color:var(--success)">✅</span> נטען: ${state.orderRows.length} שורות`;}}catch(e){}}
+
+// ==================== EDIT FORM RESPONSE ====================
+let _editSemel = null;
+
+function openEditForm(semel) {
+  _editSemel = semel;
+  const f = state.formResponses.find(r => r.semel === semel);
+  const rosterEntry = state.roster.find(r => r.semel === semel) || state.manualSchools.find(r => r.semel === semel);
+  const name = rosterEntry ? rosterEntry.name : (f ? f.formSchoolName : semel);
+  document.getElementById('edit-modal-title').textContent = '✏️ ' + name;
+  document.getElementById('edit-modal-sub').textContent = 'סמל: ' + semel + (f ? ' | תאריך: ' + f.date : ' | תגובה חדשה');
+
+  const grades = f ? f.grades : {};
+  let html = `<div style="font-weight:600;font-size:13px;margin-bottom:12px;">תלמידים לפי כיתה</div>
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;">`;
+  GRADE_NAMES.forEach(g => {
+    const val = grades[g] != null ? grades[g] : '';
+    html += `<div style="text-align:center;">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">כיתה ${g}</div>
+      <input class="edit-input" id="edit-grade-${g}" type="number" min="0" value="${val}" placeholder="—">
+    </div>`;
+  });
+  html += `</div>`;
+
+  if (!f) {
+    // Hide delete button for new entries
+    document.getElementById('edit-delete-btn').style.display = 'none';
+  } else {
+    document.getElementById('edit-delete-btn').style.display = 'inline-flex';
+  }
+
+  document.getElementById('edit-modal-body').innerHTML = html;
+  document.getElementById('modal').classList.remove('open'); // close detail modal first
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeEditModal() { document.getElementById('edit-modal').classList.remove('open'); }
+
+function saveEditedResponse() {
+  const semel = _editSemel;
+  const grades = {};
+  let total = 0;
+  GRADE_NAMES.forEach(g => {
+    const val = document.getElementById('edit-grade-'+g)?.value;
+    grades[g] = val !== '' && val != null ? Number(val) : null;
+    if (grades[g]) total += grades[g];
+  });
+
+  const existing = state.formResponses.findIndex(r => r.semel === semel);
+  if (existing >= 0) {
+    state.formResponses[existing].grades = grades;
+    state.formResponses[existing].total = total;
+  } else {
+    // Add new form response
+    const contact = state.contacts.find(c => c.semel === semel);
+    state.formResponses.push({
+      semel, date: new Date().toISOString().slice(0,10),
+      name: contact ? contact.name : semel,
+      grades, total, specializations: '', books: {}, rawRow: [], csvHeader: [],
+    });
+  }
+  save();
+  closeEditModal();
+  notify('נשמר בהצלחה!');
+  // Refresh current page
+  const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
+  if (activePage) navigate(activePage);
+}
+
+function deleteFormResponse() {
+  if (!_editSemel) return;
+  if (!confirm('האם למחוק את תגובת הטופס של בית הספר הזה?')) return;
+  state.formResponses = state.formResponses.filter(r => r.semel !== _editSemel);
+  save();
+  closeEditModal();
+  notify('התגובה נמחקה');
+  const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
+  if (activePage) navigate(activePage);
+}
+
+// ==================== EDIT ORDER ROW ====================
+let _editOrderSemel = null;
+
+function openEditOrder(semel) {
+  _editOrderSemel = semel;
+  const rowIdx = state.orderRows.findIndex(r => String(r[ORD.SEMEL]||'').trim() === semel);
+  if (rowIdx < 0) return;
+  const row = state.orderRows[rowIdx];
+  const name = row[ORD.NAME]||semel;
+
+  document.getElementById('edit-order-title').textContent = '✏️ ' + name;
+  document.getElementById('edit-order-sub').textContent = 'סמל: ' + semel;
+
+  let html = `<div style="margin-bottom:20px;">
+  <div style="font-weight:600;font-size:13px;margin-bottom:10px;">תלמידים לפי כיתה (נתוני הטופס)</div>
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;">`;
+  GRADE_NAMES.forEach((g, gi) => {
+    const fv = row[ORD.FORM_START + gi];
+    const isNA = fv == null || fv === '' || String(fv) === '#N/A';
+    const val = !isNA ? fv : '';
+    html += `<div style="text-align:center;">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">כיתה ${g}</div>
+      <input class="edit-input" id="eord-grade-${g}" type="number" min="0" value="${val}" placeholder="—">
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Books for יא-יב
+  // Separate notes cols from numeric cols
+  const numCols = [], notesColsEdit = [];
+  for (let ci = ORD.BOOKS_START; ci <= ORD.BOOKS_END; ci++) {
+    const name2 = state.orderHeader[ci];
+    if (!name2) continue;
+    const raw = row[ci];
+    if (NOTES_COLS.has(ci)) {
+      notesColsEdit.push({ ci, name: name2, val: raw != null && String(raw) !== '0' ? String(raw) : '' });
+    } else {
+      const num = raw != null && raw !== '' && String(raw) !== '#N/A' ? Number(raw) : 0;
+      numCols.push({ ci, name: name2, val: isNaN(num) ? 0 : num });
+    }
+  }
+
+  const nonZero = numCols.filter(b => b.val > 0);
+  const zero = numCols.filter(b => b.val <= 0);
+
+  html += `<div style="font-weight:600;font-size:13px;margin-bottom:10px;">ספרי יא-יב (כמויות)</div>
+  <div style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:12px;">`;
+
+  if (nonZero.length > 0) {
+    html += `<div style="font-size:11px;color:var(--success);font-weight:600;margin-bottom:8px;">📗 ספרים עם כמות (${nonZero.length})</div>`;
+    nonZero.forEach(b => {
+      html += `<div class="edit-row">
+        <div class="edit-label" dir="rtl" title="${b.name}">${b.name.length>60?b.name.slice(0,60)+'…':b.name}</div>
+        <input class="edit-input" id="eord-book-${b.ci}" type="number" min="0" value="${b.val}">
+      </div>`;
+    });
+  }
+
+  html += `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:var(--text-muted);padding:4px 0;">+ הצג ספרים עם כמות 0 (${zero.length})</summary><div style="margin-top:8px;">`;
+  zero.forEach(b => {
+    html += `<div class="edit-row">
+      <div class="edit-label" dir="rtl">${b.name.length>60?b.name.slice(0,60)+'…':b.name}</div>
+      <input class="edit-input" id="eord-book-${b.ci}" type="number" min="0" value="0">
+    </div>`;
+  });
+  html += `</div></details>`;
+
+  if (notesColsEdit.length > 0) {
+    html += `<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px;">
+    <div style="font-size:11px;color:var(--warning);font-weight:600;margin-bottom:8px;">📝 הערות / כתבים אחרים</div>`;
+    notesColsEdit.forEach(n => {
+      html += `<div class="edit-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+        <div style="font-size:11px;color:var(--text-muted);">${n.name}</div>
+        <textarea id="eord-book-${n.ci}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;resize:vertical;min-height:50px;" dir="rtl">${n.val}</textarea>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  document.getElementById('edit-order-body').innerHTML = html;
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('edit-order-modal').classList.add('open');
+}
+
+function closeEditOrderModal() { document.getElementById('edit-order-modal').classList.remove('open'); }
+
+function saveEditedOrderRow() {
+  const semel = _editOrderSemel;
+  const rowIdx = state.orderRows.findIndex(r => String(r[ORD.SEMEL]||'').trim() === semel);
+  if (rowIdx < 0) { closeEditOrderModal(); return; }
+  const newRow = [...state.orderRows[rowIdx]];
+
+  // Save grades
+  GRADE_NAMES.forEach((g, gi) => {
+    const el = document.getElementById('eord-grade-'+g);
+    if (!el) return;
+    const val = el.value;
+    newRow[ORD.FORM_START + gi] = val !== '' ? Number(val) : null;
+  });
+
+  // Save books (notes cols kept as text, others as number)
+  for (let ci = ORD.BOOKS_START; ci <= ORD.BOOKS_END; ci++) {
+    const el = document.getElementById('eord-book-'+ci);
+    if (!el) continue;
+    if (NOTES_COLS.has(ci)) {
+      newRow[ci] = el.value || '';
+    } else {
+      newRow[ci] = el.value !== '' ? Number(el.value) || 0 : 0;
+    }
+  }
+
+  state.orderRows[rowIdx] = newRow;
+  save();
+  closeEditOrderModal();
+  notify('שורת ההזמנה עודכנה!');
+  renderOrderTable();
+  renderOrderPage();
+}
+
+// ==================== ADD / EDIT SCHOOL ====================
+let _schoolModalSemel = null;
+
+function _buildGradesGrid(currentGrades) {
+  const grid = document.getElementById('sm-grades-grid');
+  grid.innerHTML = GRADE_NAMES.map(g => `
+    <div style="text-align:center;">
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">כיתה ${g}</div>
+      <input style="width:100%;padding:4px;border:1px solid var(--border);border-radius:5px;font-size:12px;text-align:center;"
+             id="sm-grade-${g}" type="number" min="0" value="${currentGrades&&currentGrades[g]!=null?currentGrades[g]:''}" placeholder="—">
+    </div>`).join('');
+}
+
+function openAddSchoolModal() {
+  _schoolModalSemel = null;
+  document.getElementById('school-modal-title').textContent = '🏫 הוסף בית ספר';
+  document.getElementById('school-delete-btn').style.display = 'none';
+  ['semel','semel2','name','level','principal','phone','email'].forEach(f => {
+    const el = document.getElementById('sm-'+f);
+    if (el) el.value = '';
+  });
+  document.getElementById('sm-status').value = 'רשמי';
+  _buildGradesGrid({});
+  document.getElementById('school-modal').classList.add('open');
+}
+
+function openEditSchoolModal(semel) {
+  const schools = getMergedSchools();
+  const s = schools.find(x => x.semel === semel);
+  if (!s) return;
+  _schoolModalSemel = semel;
+  document.getElementById('school-modal-title').textContent = '✏️ ערוך בית ספר';
+  document.getElementById('school-delete-btn').style.display = s.manual ? 'inline-flex' : 'none';
+  document.getElementById('sm-semel').value = s.semel;
+  document.getElementById('sm-semel2').value = s.semel2||'';
+  document.getElementById('sm-name').value = s.name||'';
+  document.getElementById('sm-status').value = s.status||'רשמי';
+  document.getElementById('sm-level').value = s.level||'';
+  document.getElementById('sm-principal').value = s.principal||'';
+  document.getElementById('sm-phone').value = s.principalPhone||s.phone||'';
+  document.getElementById('sm-email').value = s.principalEmail||s.email||'';
+  _buildGradesGrid(s.rosterGrades||{});
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('school-modal').classList.add('open');
+}
+
+function closeSchoolModal() { document.getElementById('school-modal').classList.remove('open'); }
+
+function saveSchoolModal() {
+  const semel = String(document.getElementById('sm-semel').value||'').trim();
+  const name  = String(document.getElementById('sm-name').value||'').trim();
+  if (!semel || !name) { notify('סמל ושם חובה','error'); return; }
+  const grades = {};
+  let total = 0;
+  GRADE_NAMES.forEach(g => {
+    const el = document.getElementById('sm-grade-'+g);
+    const v = el ? Number(el.value) : 0;
+    grades[g] = el && el.value !== '' ? v : null;
+    if (grades[g]) total += grades[g];
+  });
+  const schoolData = {
+    semel,
+    semel2: document.getElementById('sm-semel2').value||'',
+    name,
+    status: document.getElementById('sm-status').value,
+    grades, total,
+    manual: true,
+    // Store contact info on the manual school object
+    level:          document.getElementById('sm-level').value||'',
+    principal:      document.getElementById('sm-principal').value||'',
+    principalPhone: document.getElementById('sm-phone').value||'',
+    principalEmail: document.getElementById('sm-email').value||'',
+  };
+
+  if (_schoolModalSemel) {
+    // Edit existing manual school OR update roster entry
+    const manIdx = state.manualSchools.findIndex(x => x.semel === _schoolModalSemel);
+    const rosIdx = state.roster.findIndex(x => x.semel === _schoolModalSemel);
+    if (manIdx >= 0) {
+      state.manualSchools[manIdx] = schoolData;
+    } else if (rosIdx >= 0) {
+      // Update the roster entry in-place (non-manual)
+      state.roster[rosIdx] = { ...state.roster[rosIdx], ...schoolData, manual: false };
+    } else {
+      state.manualSchools.push(schoolData);
+    }
+    notify('עודכן בהצלחה!');
+  } else {
+    // Add new — remove any existing with same semel first
+    state.manualSchools = state.manualSchools.filter(x => x.semel !== semel);
+    state.manualSchools.push(schoolData);
+    notify(`בית הספר "${name}" נוסף`);
+  }
+  save(); closeSchoolModal();
+  // Refresh filter dropdowns
+  document.getElementById('filter-level').innerHTML = '<option value="">כל השכבות</option>';
+  document.getElementById('filter-status-school').innerHTML = '<option value="">כל המעמדות</option>';
+  renderSchools();
+}
+
+function deleteSchoolFromModal() {
+  const semel = String(document.getElementById('sm-semel').value||'').trim();
+  if (!confirm('למחוק בית ספר זה?')) return;
+  state.manualSchools = state.manualSchools.filter(x => x.semel !== semel);
+  save(); closeSchoolModal();
+  document.getElementById('filter-level').innerHTML = '<option value="">כל השכבות</option>';
+  document.getElementById('filter-status-school').innerHTML = '<option value="">כל המעמדות</option>';
+  renderSchools();
+  notify('נמחק');
+}
+
+function deleteManualSchool(semel) {
+  if (!confirm('למחוק?')) return;
+  state.manualSchools = state.manualSchools.filter(x => x.semel !== semel);
+  save(); renderSchools(); notify('נמחק');
+}
+
+// ==================== NOTIFY ====================
+function notify(msg,type){const el=document.getElementById('notif');el.textContent=msg;el.style.background=type==='error'?'#e03131':'#1a1d23';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
+
+// ==================== INIT ====================
+load();
+setYear(state.year);
+document.getElementById('year-input').value = state.year;
+refreshDashboard();
+</script>
+</body>
+</html>
