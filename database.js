@@ -1,179 +1,158 @@
-const Database = require('better-sqlite3');
 const path = require('path');
-const fs = require('fs');
+const fs   = require('fs');
 
-// On Railway, use /data for persistent storage if available
+// sql.js = pure JavaScript SQLite, no native compilation needed
+const initSqlJs = require('sql.js');
+
 const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+const DB_PATH = path.join(dataDir, 'textbook.db');
 
-const db = new Database(path.join(dataDir, 'textbook.db'));
+let db; // sql.js Database instance
 
-// Enable WAL mode for better performance
-db.pragma('journal_mode = WAL');
+async function initDb() {
+  const SQL = await initSqlJs();
+  if (fs.existsSync(DB_PATH)) {
+    const fileBuffer = fs.readFileSync(DB_PATH);
+    db = new SQL.Database(fileBuffer);
+  } else {
+    db = new SQL.Database();
+  }
+  createSchema();
+  return db;
+}
 
-// ==================== SCHEMA ====================
-db.exec(`
-  CREATE TABLE IF NOT EXISTS app_state (
-    key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+function persist() {
+  const data = db.export();
+  fs.writeFileSync(DB_PATH, Buffer.from(data));
+}
 
-  CREATE TABLE IF NOT EXISTS schools (
-    semel       TEXT PRIMARY KEY,
-    semel2      TEXT,
-    name        TEXT,
-    status      TEXT,
-    level       TEXT,
-    neighborhood TEXT,
-    curriculum  TEXT,
-    phone       TEXT,
-    email       TEXT,
-    principal   TEXT,
-    principal_phone TEXT,
-    principal_email TEXT,
-    grades_json TEXT,
-    total       INTEGER DEFAULT 0,
-    manual      INTEGER DEFAULT 0,
-    excluded    INTEGER DEFAULT 0,
-    year        TEXT,
-    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS form_responses (
-    semel         TEXT,
-    year          TEXT,
-    form_school   TEXT,
-    form_principal TEXT,
-    form_phone    TEXT,
-    form_email    TEXT,
-    form_rep      TEXT,
-    form_rep_phone TEXT,
-    form_rep_email TEXT,
-    grades_json   TEXT,
-    total         INTEGER DEFAULT 0,
-    date          TEXT,
-    raw_date      TEXT,
-    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (semel, year)
-  );
-
-  CREATE TABLE IF NOT EXISTS mavat (
-    semel       TEXT,
-    year        TEXT,
-    name        TEXT,
-    grades_json TEXT,
-    total       INTEGER DEFAULT 0,
-    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (semel, year)
-  );
-
-  CREATE TABLE IF NOT EXISTS years (
-    year        TEXT PRIMARY KEY,
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_active   INTEGER DEFAULT 0
-  );
-`);
+function createSchema() {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS years (
+      year       TEXT PRIMARY KEY,
+      is_active  INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS school_data (
+      semel      TEXT,
+      year       TEXT,
+      data_json  TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (semel, year)
+    );
+    CREATE TABLE IF NOT EXISTS form_data (
+      semel      TEXT,
+      year       TEXT,
+      data_json  TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (semel, year)
+    );
+    CREATE TABLE IF NOT EXISTS mavat_data (
+      semel      TEXT,
+      year       TEXT,
+      data_json  TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (semel, year)
+    );
+  `);
+  persist();
+}
 
 // ==================== HELPERS ====================
+function run(sql, params = []) {
+  db.run(sql, params);
+  persist();
+}
 
+function get(sql, params = []) {
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  if (stmt.step()) {
+    const row = stmt.getAsObject();
+    stmt.free();
+    return row;
+  }
+  stmt.free();
+  return null;
+}
+
+function all(sql, params = []) {
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  const rows = [];
+  while (stmt.step()) rows.push(stmt.getAsObject());
+  stmt.free();
+  return rows;
+}
+
+// ==================== API ====================
 function getState(key) {
-  const row = db.prepare('SELECT value FROM app_state WHERE key = ?').get(key);
+  const row = get('SELECT value FROM app_state WHERE key = ?', [key]);
   if (!row) return null;
   try { return JSON.parse(row.value); } catch(e) { return row.value; }
 }
 
 function setState(key, value) {
-  db.prepare('INSERT OR REPLACE INTO app_state (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)')
-    .run(key, JSON.stringify(value));
+  run('INSERT OR REPLACE INTO app_state (key, value) VALUES (?, ?)', [key, JSON.stringify(value)]);
 }
 
 function getYears() {
-  return db.prepare('SELECT year, is_active FROM years ORDER BY created_at DESC').all();
+  return all('SELECT year, is_active FROM years ORDER BY created_at DESC');
 }
 
 function getActiveYear() {
-  const row = db.prepare('SELECT year FROM years WHERE is_active = 1').get();
+  const row = get('SELECT year FROM years WHERE is_active = 1');
   return row ? row.year : null;
 }
 
 function setActiveYear(year) {
-  db.prepare('UPDATE years SET is_active = 0').run();
-  db.prepare('INSERT OR REPLACE INTO years (year, is_active) VALUES (?, 1)').run(year);
+  run('UPDATE years SET is_active = 0');
+  run('INSERT OR REPLACE INTO years (year, is_active) VALUES (?, 1)', [year]);
 }
 
 function getSchools(year) {
-  return db.prepare('SELECT * FROM schools WHERE year = ?').all(year).map(r => ({
-    ...r,
-    grades: r.grades_json ? JSON.parse(r.grades_json) : {},
-    manual: !!r.manual,
-    excluded: !!r.excluded,
-  }));
+  return all('SELECT data_json FROM school_data WHERE year = ?', [year])
+    .map(r => JSON.parse(r.data_json));
 }
 
 function upsertSchools(schools, year) {
-  const stmt = db.prepare(`
-    INSERT OR REPLACE INTO schools
-    (semel,semel2,name,status,level,neighborhood,curriculum,phone,email,
-     principal,principal_phone,principal_email,grades_json,total,manual,excluded,year,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
-  `);
-  const insert = db.transaction((schools) => {
-    for (const s of schools) {
-      stmt.run(s.semel,s.semel2||'',s.name||'',s.status||'',s.level||'',
-        s.neighborhood||'',s.curriculum||'',s.phone||'',s.email||'',
-        s.principal||'',s.principalPhone||'',s.principalEmail||'',
-        JSON.stringify(s.grades||{}),s.total||0,s.manual?1:0,s.excluded?1:0,year);
-    }
-  });
-  insert(schools);
+  for (const s of schools) {
+    run('INSERT OR REPLACE INTO school_data (semel, year, data_json) VALUES (?, ?, ?)',
+      [s.semel, year, JSON.stringify(s)]);
+  }
 }
 
 function getFormResponses(year) {
-  return db.prepare('SELECT * FROM form_responses WHERE year = ?').all(year).map(r => ({
-    ...r, grades: r.grades_json ? JSON.parse(r.grades_json) : {},
-  }));
+  return all('SELECT data_json FROM form_data WHERE year = ?', [year])
+    .map(r => JSON.parse(r.data_json));
 }
 
 function upsertFormResponses(responses, year) {
-  const stmt = db.prepare(`
-    INSERT OR REPLACE INTO form_responses
-    (semel,year,form_school,form_principal,form_phone,form_email,
-     form_rep,form_rep_phone,form_rep_email,grades_json,total,date,raw_date,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
-  `);
-  const insert = db.transaction((rows) => {
-    for (const r of rows) {
-      stmt.run(r.semel,year,r.formSchoolName||'',r.formPrincipal||'',
-        r.formPhone||'',r.formEmail||'',r.formRep||'',r.formRepPhone||'',
-        r.formRepEmail||'',JSON.stringify(r.grades||{}),r.total||0,
-        r.date||'',r.rawDate||'');
-    }
-  });
-  insert(responses);
+  for (const r of responses) {
+    run('INSERT OR REPLACE INTO form_data (semel, year, data_json) VALUES (?, ?, ?)',
+      [r.semel, year, JSON.stringify(r)]);
+  }
 }
 
 function getMavat(year) {
-  return db.prepare('SELECT * FROM mavat WHERE year = ?').all(year).map(r => ({
-    ...r, grades: r.grades_json ? JSON.parse(r.grades_json) : {},
-  }));
+  return all('SELECT data_json FROM mavat_data WHERE year = ?', [year])
+    .map(r => JSON.parse(r.data_json));
 }
 
 function upsertMavat(rows, year) {
-  const stmt = db.prepare(`
-    INSERT OR REPLACE INTO mavat (semel,year,name,grades_json,total,updated_at)
-    VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)
-  `);
-  const insert = db.transaction((rows) => {
-    for (const r of rows) {
-      stmt.run(r.semel,year,r.name||'',JSON.stringify(r.grades||{}),r.total||0);
-    }
-  });
-  insert(rows);
+  for (const r of rows) {
+    run('INSERT OR REPLACE INTO mavat_data (semel, year, data_json) VALUES (?, ?, ?)',
+      [r.semel, year, JSON.stringify(r)]);
+  }
 }
 
 module.exports = {
-  db, getState, setState, getYears, getActiveYear, setActiveYear,
+  initDb, getState, setState, getYears, getActiveYear, setActiveYear,
   getSchools, upsertSchools, getFormResponses, upsertFormResponses,
   getMavat, upsertMavat,
 };
