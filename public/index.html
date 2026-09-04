@@ -2482,18 +2482,19 @@ async function serverSave() {
 async function initServerYears() {
   try {
     const data = await apiGet('/years');
-    // Update year switcher
     const list = data.years.map(y => y.year);
-    if (list.length === 0) return;
-    // Store years in localStorage for switcher
-    localStorage.setItem('textbook_years', JSON.stringify(list));
-    const active = data.active || list[0];
-    if (active && active !== state.year) {
-      await serverLoad(active);
+    if (list.length === 0) {
+      // No data on server yet — show a hint
+      driveSetStatus('אין נתונים בשרת. ייבא JSON ולחץ “שמור בשרת”.', '#e03131');
+      return;
     }
+    localStorage.setItem('textbook_years', JSON.stringify(list));
+    const active = data.active || list[list.length - 1];
+    // Always load from server on startup
+    await serverLoad(active);
     renderYearSwitcher();
   } catch(e) {
-    console.warn('Server not available, using localStorage');
+    console.warn('Server not available, using localStorage:', e.message);
   }
 }
 
