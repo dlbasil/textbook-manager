@@ -615,12 +615,12 @@
           </div>
         </div>
 
-        <div class="card" style="border:2px solid #16a34a;background:#f0fdf4;">
-          <div class="card-header" style="border-color:#bbf7d0;">
-            <div class="card-title" style="color:#16a34a;">☁️ סנכרון Google Drive — תיקיית textbook-manager-app</div>
+        <div class="card" style="border:2px solid #2563eb;background:#eff6ff;">
+          <div class="card-header" style="border-color:#bfdbfe;">
+            <div class="card-title" style="color:#2563eb;">🖥️ שרת Railway — נתונים מרכזיים</div>
           </div>
           <div class="card-body">
-            <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">טען או שמור את כל הנתונים ישירות מ/אל התיקייה <strong>textbook-manager-app</strong> ב-Google Drive שלך. גיבוי אחד — גישה מכל מחשב.</p>
+            <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">הנתונים שמורים בשרת Railway — נגישים מכל מחשב וטלפון אוטומטית.</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
               <button class="btn" onclick="serverLoad(state.year)" style="background:#16a34a;color:#fff;font-weight:600;gap:8px;">
                 <span style="font-size:16px;">⬇️</span> טען מהשרת
@@ -628,16 +628,13 @@
               <button class="btn" onclick="serverSave()" style="background:#2563eb;color:#fff;font-weight:600;gap:8px;" id="drive-save-btn">
                 <span style="font-size:16px;">☁️</span> שמור בשרת
               </button>
-              <button class="btn" onclick="driveSyncFiles()" style="background:#7c3aed;color:#fff;font-weight:600;gap:8px;">
-                <span style="font-size:16px;">🔄</span> סנכרן קבצים מ-Drive
-              </button>
-              <button class="btn btn-outline" onclick="exportStateJson()" style="border-color:#64748b;color:#64748b;font-size:12px;">📤 הורד JSON</button>
+              <button class="btn btn-outline" onclick="exportStateJson()" style="border-color:#64748b;color:#64748b;font-size:12px;">📤 הורד JSON (גיבוי)</button>
               <button class="btn btn-outline" onclick="document.getElementById('file-state-json').click()" style="border-color:#64748b;color:#64748b;font-size:12px;">📥 ייבא JSON</button>
-              <input type="file" id="file-state-json" accept=".json" onchange="importStateJson(this.files[0])">
+              <input type="file" id="file-state-json" accept=".json" onchange="importStateJsonAndSave(this.files[0])">
             </div>
             <div id="drive-status" style="font-size:12px;color:var(--text-muted);min-height:18px;"></div>
-            <div style="margin-top:10px;font-size:11px;color:#16a34a;background:#dcfce7;border-radius:6px;padding:8px 12px;">
-              💡 <strong>שמור בשרת</strong> — שומר את כל הנתונים ב-Railway. <strong>טען מהשרת</strong> — טוען מכל מכשיר אוטומטית.
+            <div style="margin-top:10px;font-size:11px;color:#2563eb;background:#dbeafe;border-radius:6px;padding:8px 12px;">
+              💡 הנתונים נטענים אוטומטית מהשרת בכל פתיחה. לאחר ייבוא קבצי Excel — לחץ <strong>שמור בשרת</strong>.
             </div>
           </div>
         </div>
@@ -2365,6 +2362,14 @@ function exportStateJson() {
   notify('גיבוי הורד — שמור ב-Google Drive שלך');
 }
 
+async function importStateJsonAndSave(file) {
+  importStateJson(file);
+  // Wait for file reader to finish then save to server
+  setTimeout(async () => {
+    await serverSave();
+  }, 1500);
+}
+
 function importStateJson(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -3632,7 +3637,7 @@ initServerYears();
       <button class="btn btn-success" onclick="exportComprehensive();closeMobileMenu()" style="width:100%;margin-bottom:8px;">📥 ייצוא מקיף</button>
       <button class="btn btn-outline" onclick="changeYear();closeMobileMenu()" style="width:100%;margin-bottom:8px;">📅 שנת לימודים</button>
       <button class="btn btn-outline" onclick="driveLoad();closeMobileMenu()" style="width:100%;margin-bottom:8px;border-color:#16a34a;color:#16a34a;">⬇️ טען מ-Drive</button>
-      <button class="btn btn-outline" onclick="driveSave();closeMobileMenu()" style="width:100%;margin-bottom:8px;border-color:#2563eb;color:#2563eb;">☁️ שמור ל-Drive</button>
+      <button class="btn btn-outline" onclick="serverSave();closeMobileMenu()" style="width:100%;margin-bottom:8px;border-color:#2563eb;color:#2563eb;">☁️ שמור בשרת</button>
       <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px;">
         <div class="nav-item" onclick="confirmReset();closeMobileMenu()" style="color:var(--danger);padding-right:0;"><span class="icon">🗑️</span> איפוס נתונים</div>
       </div>
@@ -3652,7 +3657,7 @@ initServerYears();
       <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">שם השנה החדשה</label>
       <input id="new-year-input" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:14px;margin-bottom:16px;" placeholder='תשפ"ז' dir="rtl">
       <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:7px;padding:10px 12px;font-size:12px;margin-bottom:16px;">
-        ⚠️ לפני המשך — ודא שלחצת <strong>שמור ל-Drive</strong> כדי לשמר את נתוני השנה הנוכחית.
+        ⚠️ לפני המשך — ודא שלחצת <strong>שמור בשרת</strong> כדי לשמר את נתוני השנה הנוכחית.
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button class="btn btn-outline" onclick="closeNewYearModal()">ביטול</button>
@@ -3702,7 +3707,7 @@ initServerYears();
       <button class="btn btn-success" onclick="exportComprehensive();closeMobileMenu()" style="width:100%;margin-bottom:8px;">📥 ייצוא מקיף</button>
       <button class="btn btn-outline" onclick="changeYear();closeMobileMenu()" style="width:100%;margin-bottom:8px;">📅 שנת לימודים</button>
       <button class="btn btn-outline" onclick="driveLoad();closeMobileMenu()" style="width:100%;margin-bottom:8px;border-color:#16a34a;color:#16a34a;">⬇️ טען מ-Drive</button>
-      <button class="btn btn-outline" onclick="driveSave();closeMobileMenu()" style="width:100%;margin-bottom:8px;border-color:#2563eb;color:#2563eb;">☁️ שמור ל-Drive</button>
+      <button class="btn btn-outline" onclick="serverSave();closeMobileMenu()" style="width:100%;margin-bottom:8px;border-color:#2563eb;color:#2563eb;">☁️ שמור בשרת</button>
       <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px;">
         <div class="nav-item" onclick="confirmReset();closeMobileMenu()" style="color:var(--danger);padding-right:0;"><span class="icon">🗑️</span> איפוס נתונים</div>
       </div>
@@ -3722,7 +3727,7 @@ initServerYears();
       <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">שם השנה החדשה</label>
       <input id="new-year-input" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:14px;margin-bottom:16px;" placeholder='תשפ"ז' dir="rtl">
       <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:7px;padding:10px 12px;font-size:12px;margin-bottom:16px;">
-        ⚠️ לפני המשך — ודא שלחצת <strong>שמור ל-Drive</strong> כדי לשמר את נתוני השנה הנוכחית.
+        ⚠️ לפני המשך — ודא שלחצת <strong>שמור בשרת</strong> כדי לשמר את נתוני השנה הנוכחית.
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button class="btn btn-outline" onclick="closeNewYearModal()">ביטול</button>
